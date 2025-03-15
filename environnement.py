@@ -34,7 +34,7 @@ class CustomEnv(gym.Env):
 
         # definition of the variables of the environment
 
-
+        self.nb_furnished_demand=0
        
         self.wind_capacity = 170.1     # given ? or to be calculated ? or to be set with different values to test ?
         self.solar_capacity = 308.4    # max of energy we can gather using wind / sun in one step
@@ -85,17 +85,11 @@ class CustomEnv(gym.Env):
 
     def level_reward(self,no_furnished_demand):
         if no_furnished_demand>0 :
-            reward=-1
+            reward=-10
         else :
-            reward=1+self.state[3]+self.state[4]
+            reward=self.state[3]*self.phs_capacity/self.gas_capacity+self.state[4]
         return reward  
     
-    def level_and_gas_reward(self,no_furnished_demand):
-        if no_furnished_demand>0 :
-            reward=-1
-        else :
-            reward=10+self.state[3]+self.state[4]*1.2
-        return reward   
 
 
 ###############################################################   U P D A T E   L E V E L   1   #####################################################################################################
@@ -218,8 +212,12 @@ class CustomEnv(gym.Env):
       
         self.state[2] = residual_production/(self.wind_capacity+self.solar_capacity) #taux par rapport à la production maximale possible, majoré par 1 mais peut être inférieure à -1 si la demande est deux fois plus importante que l'offre
         
-        self.state[3],self.state[4],no_furnished_demand,phs_in, gas_in, phs_usage, gas_usage=self.update_levels_unguided(action,residual_production)
-
+        self.state[3],self.state[4],no_furnished_demand,phs_in, gas_in, phs_usage, gas_usage=self.update_levels_guided(action,residual_production)
+        
+        if no_furnished_demand==0 :
+            self.nb_furnished_demand+=1
+        
+        
         # Tests unitaires pour vérifier cohérence des résultats
 
         #tests sur les bornes des états
@@ -261,8 +259,21 @@ class CustomEnv(gym.Env):
         if self.time==self.times[-1] :
             print(f"State: {self.state}")
             print(f"Total reward: {self.total_reward}")
+            elec=self.state[3]*self.phs_capacity+self.state[4]*self.gas_capacity
+            print(f"elec_storage : {elec}")
+            print(f"nombre de demandes fournies : {self.nb_furnished_demand}")
+            print(f"nombre de demande total : {len(self.times)}")
+            
 
     def close(self):
         """Clean up resources (optional)"""
 
 check_env(CustomEnv(), warn=True, skip_render_check=True)   
+
+#1 an cyclique, début n'importe quand dans l'année, on ne dure pas toujours 1 an, qqté non fournie
+
+#critère de réussite : combien il a fourni, combien il a stocké
+#évaluation sur une quarantaine de séries
+#regarder si stable baseline peut évaluer sur un échantillon d'entrainement
+#retourner un dict avec les indicateurs qui nous intéressent
+#création config

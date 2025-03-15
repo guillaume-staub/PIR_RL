@@ -30,6 +30,9 @@ start=time.time()
 model.learn(total_timesteps=10000, callback=checkpoint_callback)
 
 # Save the final model
-model.save("./models/unguided_level_reward")
+model.save("./models/guided_level_reward")
 
 end=time.time()
+
+print(end-start)
+
