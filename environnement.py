@@ -52,13 +52,17 @@ class CustomEnv(gym.Env):
         self.region,self.annee,annee_path=selection_annee_aleatoire("./ech_apprentissage")
         solar_path=os.path.join(annee_path,"solar.csv")
         wind_path=os.path.join(annee_path,"wind_onshore.csv")
-        
         self.solar_data = pd.read_csv(solar_path)['facteur_charge'].values
         self.wind_data = pd.read_csv(wind_path)['facteur_charge'].values
         
         #self.solar_data = pd.read_csv('./data/solar.csv')['facteur_charge'].values
         #self.wind_data = pd.read_csv('./data/wind_onshore.csv')['facteur_charge'].values
 
+        #traitement des années bissextiles
+        if int(self.annee)%4==0:
+            self.nb_jours_annee=366
+        else:
+            self.nb_jours_annee=365
 
         # definition of the variables of the environment
 
@@ -95,7 +99,7 @@ class CustomEnv(gym.Env):
         residual_production=self.wind_capacity*self.wind_data[self.time] + self.solar_capacity*self.solar_data[self.time] - self.demand[self.time]
 
         # We start at a random day and hour of the year, with the residual production of the year, and the energy tanks half full
-        self.state = np.array([self.time%24/24,int(self.time/24)%365/365,residual_production/(self.wind_capacity+self.solar_capacity),1/2,1/2])
+        self.state = np.array([self.time%24/24,int(self.time/24)%self.nb_jours_annee/self.nb_jours_annee,residual_production/(self.wind_capacity+self.solar_capacity),1/2,1/2])
 
         # TO DO : the histogram of the values to see if normalization is pertinent
         obs=self.state
@@ -244,9 +248,9 @@ class CustomEnv(gym.Env):
         # The second one is a 24hours periodic function, so the agent can better understand how days work,
         # understanding for example that every night the consumption decreases
       
-        self.time += 1
+        self.time = (self.time + 1) % len(self.times)
         self.state[0]=self.time%24/24 # heure
-        self.state[1]=(int(self.time/24)%365)/365 #jour
+        self.state[1]=(int(self.time/24)%self.nb_jours_annee)/self.nb_jours_annee #jour
         
         
         residual_production = self.wind_capacity*self.wind_data[self.time] + self.solar_capacity*self.solar_data[self.time] - self.demand[self.time]
