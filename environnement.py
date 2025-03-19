@@ -10,6 +10,8 @@ import numpy as np
 import pandas as pd
 from stable_baselines3.common.env_checker import check_env
 import yaml
+from creation_echantillons import selection_annee_aleatoire
+import os
 
 # Loading of the YAML file:
 def load_config(yaml_file):
@@ -44,9 +46,18 @@ class CustomEnv(gym.Env):
         demand_data.columns = ["time","demand"]
         self.times = demand_data['time'].values
         self.time = 0   # Time indicator
+        self.end= self.times[-1]
         self.demand = demand_data['demand'].values
-        self.solar_data = pd.read_csv('./data/solar.csv')['facteur_charge'].values
-        self.wind_data = pd.read_csv('./data/wind_onshore.csv')['facteur_charge'].values
+        
+        self.region,self.annee,annee_path=selection_annee_aleatoire("./ech_apprentissage")
+        solar_path=os.path.join(annee_path,"solar.csv")
+        wind_path=os.path.join(annee_path,"wind_onshore.csv")
+        
+        self.solar_data = pd.read_csv(solar_path)['facteur_charge'].values
+        self.wind_data = pd.read_csv(wind_path)['facteur_charge'].values
+        
+        #self.solar_data = pd.read_csv('./data/solar.csv')['facteur_charge'].values
+        #self.wind_data = pd.read_csv('./data/wind_onshore.csv')['facteur_charge'].values
 
 
         # definition of the variables of the environment
@@ -78,7 +89,8 @@ class CustomEnv(gym.Env):
 
     def reset(self,seed=None,options=None):
         """Reset the environment to its initial state"""
-        self.time = 0   # np.random.choice(self.times)
+        self.time=np.random.choice(self.times)
+        self.end=np.random.choice(self.times)
         self.total_reward = 0
         residual_production=self.wind_capacity*self.wind_data[self.time] + self.solar_capacity*self.solar_data[self.time] - self.demand[self.time]
 
@@ -274,8 +286,7 @@ class CustomEnv(gym.Env):
         self.total_reward += reward
 
         # Example: Termination condition
-        terminated = bool(self.state[1]==int(self.times[-1]/24)%365/365 and self.state[0]==self.times[-1]%24/24) #finit à la fin de la série
-        # done=self.times[-1]==self.time
+        terminated = bool(self.time==self.end) 
         info = {}  # Additional information (can be empty)
         
         truncated=False
