@@ -24,4 +24,4 @@ done = False
 while not done:
     action, _ = model.predict(obs, deterministic=True)
     obs, reward, done, truncated, info = env.step(action)
-    env.render(reward=reward)
+    env.render()

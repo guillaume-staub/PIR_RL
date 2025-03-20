@@ -65,8 +65,6 @@ class CustomEnv(gym.Env):
             self.nb_jours_annee=365
 
         # definition of the variables of the environment
-
-        self.nb_furnished_demand = 0
        
         self.wind_capacity = 170.1  # given ? or to be calculated ? or to be set with different values to test ?
         self.solar_capacity = 308.4 # max of energy we can gather using wind / sun in one step
@@ -88,7 +86,8 @@ class CustomEnv(gym.Env):
         self.state = None
         # Self observation space : State vector (date time PHS levels and so on)
         # Self state : Usually at None, used to initialize values at the very first round
-        info, obs=self.reset()
+        
+        obs, self.eval_data=self.reset()
 
 
     def reset(self,seed=None,options=None):
@@ -103,15 +102,17 @@ class CustomEnv(gym.Env):
 
         # TO DO : the histogram of the values to see if normalization is pertinent
         obs=self.state
-        info=dict()
+
+        info={"phs_storage": self.state[3], "gas_storage":self.state[4], "total_furnished_demand" :0,"total_no_furnished_demand":0,"total_reward":0,"nb_heures":(self.end-self.time)%(self.nb_jours_annee*24)}
+        #la demande fournie concerne uniquement la demande fournie avec les réserves
         return obs,info
     
 
     def reward_v1(self,no_furnished_demand):
         if no_furnished_demand>0 :
-            reward=-1
+            reward=-no_furnished_demand
         else :
-            reward=1
+            reward=self.state[3]*self.phs_capacity+self.gas_capacity*self.state[4]
         return reward
 
 
@@ -259,8 +260,6 @@ class CustomEnv(gym.Env):
         
         self.state[3],self.state[4],no_furnished_demand,phs_in, gas_in, phs_usage, gas_usage=self.update_level_function(action,residual_production)
         
-        if no_furnished_demand==0 :
-            self.nb_furnished_demand+=1
         
         
         # Tests unitaires pour vérifier cohérence des résultats
@@ -286,27 +285,38 @@ class CustomEnv(gym.Env):
         # Reward function
         # cout basé sur la pénalité d'écrétage / de perte par conversion d'énergie ?
       
-        reward = self.reward_function(no_furnished_demand)
-        self.total_reward += reward
+        
 
-        # Example: Termination condition
+        
+        reward = self.reward_function(no_furnished_demand)
+
+        # info : evaluation data
+        
+        self.eval_data["phs_storage"]=self.state[3]
+        self.eval_data["gas_storage"]=self.state[4]
+        self.eval_data["total_reward"]+=reward
+        if residual_production<0 :
+            self.eval_data["total_furnished_demand"]-=(residual_production+no_furnished_demand)
+            self.eval_data["total_no_furnished_demand"]+=no_furnished_demand
+        
+
+        
+        
+
+        
+
+        # Termination condition
         terminated = bool(self.time==self.end) 
-        info = {}  # Additional information (can be empty)
         
         truncated=False
 
-        return self.state, reward, terminated, truncated, info
+        return self.state, reward, terminated, truncated, self.eval_data
 
 
-    def render(self, reward, mode='human'):
+    def render(self, mode='human'):
         """Render the environment (optional)"""
-        if self.time==self.times[-1] :
-            print(f"State: {self.state}")
-            print(f"Total reward: {self.total_reward}")
-            elec=self.state[3]*self.phs_capacity+self.state[4]*self.gas_capacity
-            print(f"elec_storage : {elec}")
-            print(f"nombre de demandes fournies : {self.nb_furnished_demand}")
-            print(f"nombre de demande total : {len(self.times)}")
+        if self.time==self.end :
+            print(self.eval_data)
             
 
     def close(self):
