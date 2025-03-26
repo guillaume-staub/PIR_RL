@@ -16,8 +16,8 @@ from environnement import CustomEnv
 
 
 # Visualiser l'agent entraîné
-model = SAC.load("./models/guided_level_reward")
-env = CustomEnv()
+model = SAC.load("./models/guided_level_rewardv12")
+env = CustomEnv(learning=False)
 
 obs, _ = env.reset()
 done = False

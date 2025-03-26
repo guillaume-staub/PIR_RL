@@ -46,9 +46,7 @@ for i in range (taille_test):
     destination=os.path.join(dossier_test,region)
     if not os.path.isdir(destination):  # Vérifie si le dossier existe
         os.mkdir(destination)
-        
-    destination=os.path.join(destination,annee)
-    os.mkdir(destination)
+
     shutil.move(annee_path,destination)
     
 

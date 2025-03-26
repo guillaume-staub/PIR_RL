@@ -28,7 +28,7 @@ print(f"Step function: {update_levels_function}")
 
 
 class CustomEnv(gym.Env):
-    def __init__(self):
+    def __init__(self,learning=True):
         super(CustomEnv, self).__init__()
 
         # Define action and observation space
@@ -49,7 +49,12 @@ class CustomEnv(gym.Env):
         self.end= self.times[-1]
         self.demand = demand_data['demand'].values
         
-        self.region,self.annee,annee_path=selection_annee_aleatoire("./ech_apprentissage")
+        if learning :
+        
+            self.region,self.annee,annee_path=selection_annee_aleatoire("./ech_apprentissage")
+        else :
+            self.region,self.annee,annee_path=selection_annee_aleatoire("./ech_test")
+
         solar_path=os.path.join(annee_path,"solar.csv")
         wind_path=os.path.join(annee_path,"wind_onshore.csv")
         self.solar_data = pd.read_csv(solar_path)['facteur_charge'].values
@@ -110,18 +115,18 @@ class CustomEnv(gym.Env):
 
     def reward_v1(self,no_furnished_demand):
         if no_furnished_demand>0 :
-            reward=-no_furnished_demand
+            reward=-no_furnished_demand/(self.phs_capacity+self.gas_capacity)
         else :
-            reward=self.state[3]*self.phs_capacity+self.gas_capacity*self.state[4]
+            reward=(self.state[3]*self.phs_capacity+self.gas_capacity*self.state[4])/(self.phs_capacity+self.gas_capacity)
         return reward
 
 
     def reward_v2(self,no_furnished_demand):
         if no_furnished_demand>0 :
-            reward=-10
-        else :
-            reward=self.state[3]*self.phs_capacity/self.gas_capacity+self.state[4]
-        return reward 
+            reward=-no_furnished_demand
+        elif self.state[2]>0 :
+            reward=self.state[3]*self.phs_capacity+self.gas_capacity*self.state[4]
+        return reward
     
     
 
