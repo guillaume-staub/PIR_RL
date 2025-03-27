@@ -92,6 +92,15 @@ class CustomEnv(gym.Env):
         # Self state : Usually at None, used to initialize values at the very first round
         
         obs, self.eval_data=self.reset()
+        columns = ['phs_storage', 'gas_storage', 'total_energy_stored', 'total_furnished_demand', 'total_no_furnished_demand', 'residual_production', 'wasted_energy', 'stored_energy', 'total_reward']
+        taille_df = self.eval_data["nb_heures"] # A VERIFIER
+        self.eval_df = pd.DataFrame(None, index=range(taille_df), columns=columns)
+        self.eval_df.loc[0, "phs_storage"] = self.eval_data['phs_storage']
+        self.eval_df.loc[0, "gas_storage"] = self.eval_data['gas_storage']
+        self.eval_df.loc[0, "total_furnished_demand"] = self.eval_data['total_furnished_demand']
+        self.eval_df.loc[0, "total_no_furnished_demand"] = self.eval_data['total_no_furnished_demand']
+        self.eval_df.loc[0, "total_reward"] = self.eval_data['total_reward']
+
 
 
     def reset(self,seed=None,options=None):
@@ -107,8 +116,13 @@ class CustomEnv(gym.Env):
         # TO DO : the histogram of the values to see if normalization is pertinent
         obs=self.state
 
-        info={"phs_storage": self.state[3], "gas_storage":self.state[4], "total_furnished_demand" :0,"total_no_furnished_demand":0,"total_reward":0,"nb_heures":(self.end-self.time)%(self.nb_jours_annee*24)}
-        #la demande fournie concerne uniquement la demande fournie avec les réserves
+        info={"phs_storage": self.state[3],
+              "gas_storage":self.state[4],
+              "total_furnished_demand" :0,
+              "total_no_furnished_demand":0,
+              "total_reward":0,
+              "nb_heures":(self.end-self.time)%(self.nb_jours_annee*24)}
+        # la demande fournie concerne uniquement la demande fournie avec les réserves
         return obs,info
     
 
@@ -296,9 +310,15 @@ class CustomEnv(gym.Env):
         self.eval_data["phs_storage"]=self.state[3]
         self.eval_data["gas_storage"]=self.state[4]
         self.eval_data["total_reward"]+=reward
-        if residual_production<0 :
-            self.eval_data["total_furnished_demand"]-=(residual_production+no_furnished_demand)
-            self.eval_data["total_no_furnished_demand"]+=no_furnished_demand
+        self.eval_data["total_furnished_demand"]-=(residual_production+no_furnished_demand)
+        self.eval_data["total_no_furnished_demand"]+=no_furnished_demand
+        
+        self.eval_df.loc[self.time, "phs_storage"] = self.eval_data['phs_storage']
+        self.eval_df.loc[self.time, "gas_storage"] = self.eval_data['gas_storage']
+        self.eval_df.loc[self.time, "total_furnished_demand"] = self.eval_data['total_furnished_demand']
+        self.eval_df.loc[self.time, "total_no_furnished_demand"] = self.eval_data['total_no_furnished_demand']
+        self.eval_df.loc[self.time, "total_reward"] = self.eval_data['total_reward']
+
         
 
         
