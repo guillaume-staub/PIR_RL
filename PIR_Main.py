@@ -10,13 +10,13 @@
 # tirer les séries aléatoirement à chaque reset (aller voir sur RTE pour les données en ligne)
 
 from stable_baselines3 import SAC
-from environnement import CustomEnv
+from environnement_avecdf import CustomEnv
 
 
 
 
 # Visualiser l'agent entraîné
-model = SAC.load("./models/guided_level_rewardv12")
+model = SAC.load("./models/guided_reward_step_week_end")
 env = CustomEnv(learning=False)
 
 obs, _ = env.reset()

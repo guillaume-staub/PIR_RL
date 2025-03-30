@@ -5,7 +5,7 @@ Created on Fri Mar 14 13:22:02 2025
 @author: Elsa_Ehrhart
 """
 
-from environnement import CustomEnv
+from environnement_avecdf import CustomEnv
 from stable_baselines3 import SAC
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.callbacks import CheckpointCallback
@@ -30,7 +30,7 @@ start=time.time()
 model.learn(total_timesteps=10000, callback=checkpoint_callback)
 
 # Save the final model
-model.save("./models/guided_level_rewardv12")
+model.save("./models/guided_reward_step_week_end")
 
 end=time.time()
 

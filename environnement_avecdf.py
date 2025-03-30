@@ -12,6 +12,7 @@ from stable_baselines3.common.env_checker import check_env
 import yaml
 from creation_echantillons import selection_annee_aleatoire
 import os
+import matplotlib.pyplot as plt
 
 # Loading of the YAML file:
 def load_config(yaml_file):
@@ -46,6 +47,7 @@ class CustomEnv(gym.Env):
         demand_data.columns = ["time","demand"]
         self.times = demand_data['time'].values
         self.time = 0   # Time indicator
+        self.begin=0
         self.end= self.times[-1]
         self.demand = demand_data['demand'].values
         
@@ -92,26 +94,31 @@ class CustomEnv(gym.Env):
         # Self state : Usually at None, used to initialize values at the very first round
         
         obs, self.eval_data=self.reset()
-        columns = ['phs_storage', 'gas_storage', 'total_energy_stored', 'total_furnished_demand', 'total_no_furnished_demand', 'residual_production', 'wasted_energy', 'stored_energy', 'total_reward']
+        columns = ['phs_storage', 'gas_storage', 'total_energy_stored', 'furnished_demand', 'no_furnished_demand', 'residual_production', 'wasted_energy', 'stored_energy', 'reward']
+        
         taille_df = self.eval_data["nb_heures"] # A VERIFIER
         self.eval_df = pd.DataFrame(None, index=range(taille_df), columns=columns)
         self.eval_df.loc[0, "phs_storage"] = self.eval_data['phs_storage']
         self.eval_df.loc[0, "gas_storage"] = self.eval_data['gas_storage']
-        self.eval_df.loc[0, "total_furnished_demand"] = self.eval_data['total_furnished_demand']
-        self.eval_df.loc[0, "total_no_furnished_demand"] = self.eval_data['total_no_furnished_demand']
-        self.eval_df.loc[0, "total_reward"] = self.eval_data['total_reward']
+        self.eval_df.loc[0, "furnished_demand"] = self.eval_data['total_furnished_demand']
+        self.eval_df.loc[0, "no_furnished_demand"] = self.eval_data['total_no_furnished_demand']
+        self.eval_df.loc[0, "reward"] = self.eval_data['total_reward']
 
 
 
     def reset(self,seed=None,options=None):
         """Reset the environment to its initial state"""
-        self.time=np.random.choice(self.times)
+        self.begin=np.random.choice(self.times)
+        self.time=self.begin
         self.end=np.random.choice(self.times)
         self.total_reward = 0
         residual_production=self.wind_capacity*self.wind_data[self.time] + self.solar_capacity*self.solar_data[self.time] - self.demand[self.time]
-
+        
+        level_gas_init=np.random.uniform(0,0.5)
+        
+        
         # We start at a random day and hour of the year, with the residual production of the year, and the energy tanks half full
-        self.state = np.array([self.time%24/24,int(self.time/24)%self.nb_jours_annee/self.nb_jours_annee,residual_production/(self.wind_capacity+self.solar_capacity),1/2,1/2])
+        self.state = np.array([self.time%24/24,int(self.time/24)%self.nb_jours_annee/self.nb_jours_annee,residual_production/(self.wind_capacity+self.solar_capacity),1/2,level_gas_init])
 
         # TO DO : the histogram of the values to see if normalization is pertinent
         obs=self.state
@@ -126,20 +133,33 @@ class CustomEnv(gym.Env):
         return obs,info
     
 
-    def reward_v1(self,no_furnished_demand):
-        if no_furnished_demand>0 :
-            reward=-no_furnished_demand/(self.phs_capacity+self.gas_capacity)
-        else :
-            reward=(self.state[3]*self.phs_capacity+self.gas_capacity*self.state[4])/(self.phs_capacity+self.gas_capacity)
+    def reward_demand_step(self):
+        ind=self.time-self.begin
+        reward=-self.eval_df.loc[ind, "no_furnished_demand"]
         return reward
-
-
-    def reward_v2(self,no_furnished_demand):
-        if no_furnished_demand>0 :
-            reward=-no_furnished_demand
-        elif self.state[2]>0 :
-            reward=self.state[3]*self.phs_capacity+self.gas_capacity*self.state[4]
+    
+    def reward_demand_periodic(self,period):
+        reward=0 
+        ind=self.time-self.begin
+        if self.time>period and self.time%period==0:
+            no_furnished_demand_week=self.eval_df.loc[ind-period:ind, "no_furnished_demand"].sum()
+            reward=-no_furnished_demand_week
         return reward
+    
+    def reward_demand_end(self):
+        reward=0
+        if self.time==self.end :
+            reward=-self.eval_df["no_furnished_demand"].sum()
+        return reward
+    
+    #reward qui prend en compte le step, la semaine et la fin
+    def reward_v1(self):
+        return self.reward_demand_step()+self.reward_demand_periodic(24*7)+self.reward_demand_end()
+    
+    
+
+    def reward_v2(self):
+        return 1
     
     
 
@@ -303,21 +323,28 @@ class CustomEnv(gym.Env):
         # Reward function
         # cout basé sur la pénalité d'écrétage / de perte par conversion d'énergie ?
         
-        reward = self.reward_function(no_furnished_demand)
+        
 
         # info : evaluation data
         
         self.eval_data["phs_storage"]=self.state[3]
         self.eval_data["gas_storage"]=self.state[4]
-        self.eval_data["total_reward"]+=reward
+        
         self.eval_data["total_furnished_demand"]-=(residual_production+no_furnished_demand)
         self.eval_data["total_no_furnished_demand"]+=no_furnished_demand
         
-        self.eval_df.loc[self.time, "phs_storage"] = self.eval_data['phs_storage']
-        self.eval_df.loc[self.time, "gas_storage"] = self.eval_data['gas_storage']
-        self.eval_df.loc[self.time, "total_furnished_demand"] = self.eval_data['total_furnished_demand']
-        self.eval_df.loc[self.time, "total_no_furnished_demand"] = self.eval_data['total_no_furnished_demand']
-        self.eval_df.loc[self.time, "total_reward"] = self.eval_data['total_reward']
+        
+        ind=self.time-self.begin
+        self.eval_df.loc[ind, "phs_storage"] = self.state[3]
+        self.eval_df.loc[ind, "gas_storage"] = self.state[4]
+        self.eval_df.loc[ind, "furnished_demand"] = max(0,-residual_production-no_furnished_demand)
+        self.eval_df.loc[ind, "no_furnished_demand"] = no_furnished_demand
+        
+        reward = self.reward_function()
+        
+        self.eval_data["total_reward"]+=reward
+        
+        self.eval_df.loc[ind, "reward"] = reward
 
         
 
@@ -331,7 +358,7 @@ class CustomEnv(gym.Env):
         
         truncated=False
 
-        return self.state, reward, terminated, truncated, self.eval_data[-1]
+        return self.state, reward, terminated, truncated, self.eval_data
 
 
     def render(self, mode='human'):
@@ -339,6 +366,10 @@ class CustomEnv(gym.Env):
         if self.time==self.end :
             print(self.eval_data)
             
+            #plot du stockage du gas
+            plt.plot(self.eval_df["gas_storage"])
+            plt.title("évolution du taux de remplissage du gas")
+            plt.show()
 
     def close(self):
         """Clean up resources (optional)"""
@@ -352,3 +383,5 @@ check_env(CustomEnv(), warn=True, skip_render_check=True)
 #regarder si stable baseline peut évaluer sur un échantillon d'entrainement
 #retourner un dict avec les indicateurs qui nous intéressent
 #création config
+
+#voir RTE
