@@ -43,36 +43,53 @@ class CustomEnv(gym.Env):
 
         # Collection of the data
 
+        
+        
+        if learning :
+            self.region,self.annee1,annee1_path=selection_annee_aleatoire("./ech_apprentissage")
+            self.region,self.annee2,annee2_path=selection_annee_aleatoire("./ech_apprentissage",self.region)
+        else :
+            self.region,self.annee1,annee1_path=selection_annee_aleatoire("./ech_test")
+            self.region,self.annee2,annee2_path=selection_annee_aleatoire("./ech_test",self.region)
+
+
+        #chargement des données pour deux années
+        
+        solar_path1=os.path.join(annee1_path,"solar.csv")
+        wind_path1=os.path.join(annee1_path,"wind_onshore.csv")
+        solar_path2=os.path.join(annee2_path,"solar.csv")
+        wind_path2=os.path.join(annee2_path,"wind_onshore.csv")
+        
+        solar_data1 = pd.read_csv(solar_path1)['facteur_charge'].values
+        wind_data1 = pd.read_csv(wind_path1)['facteur_charge'].values
+        solar_data2 = pd.read_csv(solar_path2)['facteur_charge'].values
+        wind_data2 = pd.read_csv(wind_path2)['facteur_charge'].values
+
+        self.solar_data = np.concatenate([solar_data1, solar_data2])
+        self.wind_data = np.concatenate([wind_data1, wind_data2])
+        
+        
         demand_data = pd.read_csv('./data/demand2050_ADEME.csv', header=None)
         demand_data.columns = ["time","demand"]
         self.times = demand_data['time'].values
         self.time = 0   # Time indicator
-        self.begin=0
+        self.begin = 0
         self.end= self.times[-1]
-        self.demand = demand_data['demand'].values
-        
-        if learning :
-            self.region,self.annee,annee_path=selection_annee_aleatoire("./ech_apprentissage")
-        else :
-            self.region,self.annee,annee_path=selection_annee_aleatoire("./ech_test")
-
-        solar_path=os.path.join(annee_path,"solar.csv")
-        wind_path=os.path.join(annee_path,"wind_onshore.csv")
-        self.solar_data = pd.read_csv(solar_path)['facteur_charge'].values
-        self.wind_data = pd.read_csv(wind_path)['facteur_charge'].values
+        demand = demand_data['demand'].values
+        self.demand = np.concatenate([demand])
         
         #self.solar_data = pd.read_csv('./data/solar.csv')['facteur_charge'].values
         #self.wind_data = pd.read_csv('./data/wind_onshore.csv')['facteur_charge'].values
 
         #traitement des années bissextiles
-        if int(self.annee)%4==0:
-            self.nb_jours_annee=366
-        else:
-            self.nb_jours_annee=365
+        self.nb_jours_annee=365+(int(self.annee1)%4==0)
+        
+        #repère sur l'année en cours
+        self.annee1=True
 
         # definition of the variables of the environment
        
-        self.wind_capacity = 170.1  # given ? or to be calculated ? or to be set with different values to test ?
+        self.wind_capacity = 170.1
         self.solar_capacity = 308.4 # max of energy we can gather using wind / sun in one step
 
         self.phs_capacity = 180
@@ -128,7 +145,7 @@ class CustomEnv(gym.Env):
               "total_furnished_demand" :0,
               "total_no_furnished_demand":0,
               "total_reward":0,
-              "nb_heures":(self.end-self.time)%(self.nb_jours_annee*24)}
+              "nb_heures":(self.end-self.time)%(self.nb_jours_annee*24)+365+(int(self.annee2)%4==0)}
         # la demande fournie concerne uniquement la demande fournie avec les réserves
         return obs,info
     
@@ -140,7 +157,7 @@ class CustomEnv(gym.Env):
     
     def reward_demand_periodic(self,period):
         reward=0 
-        ind=self.time-self.begin
+        ind=(self.time-self.begin)%(self.nb_jours_annee*24)
         if self.time>period and self.time%period==0:
             no_furnished_demand_week=self.eval_df.loc[ind-period:ind, "no_furnished_demand"].sum()
             reward=-no_furnished_demand_week
@@ -154,7 +171,7 @@ class CustomEnv(gym.Env):
     
     #reward qui prend en compte le step, la semaine et la fin
     def reward_v1(self):
-        return self.reward_demand_step()+self.reward_demand_periodic(24*7)+self.reward_demand_end()
+        return self.reward_demand_step()+self.reward_demand_end()
     
     
 
@@ -292,7 +309,7 @@ class CustomEnv(gym.Env):
         self.state[1]=(int(self.time/24)%self.nb_jours_annee)/self.nb_jours_annee #jour
         
         
-        residual_production = self.wind_capacity*self.wind_data[self.time] + self.solar_capacity*self.solar_data[self.time] - self.demand[self.time]
+        residual_production = self.wind_capacity*self.wind_data[self.time+int(not(self.annee1))*(self.times).shape[0]] + self.solar_capacity*self.solar_data[self.time+int(not(self.annee1))*(self.times).shape[0]] - self.demand[self.time]
       
         self.state[2] = residual_production/(self.wind_capacity+self.solar_capacity) #taux par rapport à la production maximale possible, majoré par 1 mais peut être inférieure à -1 si la demande est deux fois plus importante que l'offre
         
@@ -330,11 +347,12 @@ class CustomEnv(gym.Env):
         self.eval_data["phs_storage"]=self.state[3]
         self.eval_data["gas_storage"]=self.state[4]
         
-        self.eval_data["total_furnished_demand"]-=(residual_production+no_furnished_demand)
+        if residual_production<0 :
+            self.eval_data["total_furnished_demand"]-=(residual_production+no_furnished_demand)
         self.eval_data["total_no_furnished_demand"]+=no_furnished_demand
         
         
-        ind=self.time-self.begin
+        ind=self.time-self.begin+int(not(self.annee1))**(self.times).shape[0]
         self.eval_df.loc[ind, "phs_storage"] = self.state[3]
         self.eval_df.loc[ind, "gas_storage"] = self.state[4]
         self.eval_df.loc[ind, "furnished_demand"] = max(0,-residual_production-no_furnished_demand)
@@ -354,7 +372,10 @@ class CustomEnv(gym.Env):
         
 
         # Termination condition
-        terminated = bool(self.time==self.end) 
+        if bool(self.time==self.begin-1) and self.annee1 :
+            self.annee1=False
+        
+        terminated = bool(self.time==self.end) and not(self.annee1)
         
         truncated=False
 
@@ -366,10 +387,12 @@ class CustomEnv(gym.Env):
         if self.time==self.end :
             print(self.eval_data)
             
-            #plot du stockage du gas
+            #plot du stockage du gaz
             plt.plot(self.eval_df["gas_storage"])
-            plt.title("évolution du taux de remplissage du gas")
+            plt.title("évolution du taux de remplissage du gaz")
             plt.show()
+            
+            #plot de la fourniture de la demande
 
     def close(self):
         """Clean up resources (optional)"""

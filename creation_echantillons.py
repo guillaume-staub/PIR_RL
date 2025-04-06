@@ -9,16 +9,21 @@ import os
 import shutil
 import random
 
-def selection_annee_aleatoire(dossier):
-    #liste des régions sans les dossiers cachés
-    regions=[d for d in os.listdir(dossier) if (not d.startswith(".DS_Store") and not d.startswith("._.DS_Store"))]
-    #region aléatoire
-    region=random.choice(regions)
+def selection_annee_aleatoire(dossier,set_region=" "):
+    if set_region==" ":
+        #liste des régions sans les dossiers cachés
+        regions=[d for d in os.listdir(dossier) if (not d.startswith(".DS_Store") and not d.startswith("._.DS_Store") and not d.startswith("._"))]
+        #region aléatoire
+        region=random.choice(regions)
+    else :
+        region=set_region
     region_path=os.path.join(dossier,region)
-    annees=[d for d in os.listdir(region_path) if (not d.startswith(".DS_Store") and not d.startswith("._.DS_Store"))]
+    annees=[d for d in os.listdir(region_path) if (not d.startswith(".DS_Store") and not d.startswith("._.DS_Store") and not d.startswith("._"))]
     annee=random.choice(annees)
     annee_path=os.path.join(region_path,annee)
     return region,annee,annee_path
+# %%
+
 
 
 dossier_apprentissage = ".\ech_apprentissage"
