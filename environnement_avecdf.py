@@ -223,8 +223,7 @@ class CustomEnv(gym.Env):
             else : #on vide aussi du gaz pour essayer de répondre à la demande
                 gas_usage=min(self.state[4]*self.gas_capacity*self.gas_efficiency,self.gas_power_out,-(residual_production+phs_usage))
             
-            # Computation of the unfurnished demand
-            no_furnished_demand=max(0,-residual_production-gas_usage-phs_usage)
+       
             
         # Adding the Constraints
         phs_in=min(phs_in,self.phs_power,self.phs_capacity-self.state[3]*self.phs_capacity)
@@ -234,7 +233,8 @@ class CustomEnv(gym.Env):
         state3=self.state[3]+phs_in/self.phs_capacity-phs_usage/self.phs_efficiency/self.phs_capacity
         state4=self.state[4]+gas_in/self.gas_capacity-gas_usage/self.gas_efficiency/self.gas_capacity
         
-        
+        if residual_production<0 :
+            no_furnished_demand=max(0,-residual_production-gas_usage-phs_usage-phs_in-gas_in)
         
         # For unit tests
         return (state3,state4,no_furnished_demand, phs_in, gas_in, phs_usage, gas_usage)
@@ -270,8 +270,10 @@ class CustomEnv(gym.Env):
                 gas_in=phs_usage+residual_production
             else : #on vide aussi du gaz pour essayer de répondre à la demande
                 gas_usage=min(self.state[4]*self.gas_capacity*self.gas_efficiency,self.gas_power_out,-(residual_production+phs_usage))
-            no_furnished_demand=max(0,-residual_production-gas_usage-phs_usage)
-         
+            
+        
+        
+        
         #ajout des contraintes
         phs_in=min(phs_in,self.phs_power,self.phs_capacity-self.state[3]*self.phs_capacity)
         gas_in=min(gas_in,self.gas_power_in,self.gas_capacity-self.state[4]*self.gas_capacity)
@@ -281,6 +283,8 @@ class CustomEnv(gym.Env):
         state4=self.state[4]+gas_in/self.gas_capacity-gas_usage/self.gas_efficiency/self.gas_capacity
          
         #calcul demande non fournie
+        if residual_production<0 :
+            no_furnished_demand=max(0,-residual_production-gas_usage-phs_usage-phs_in-gas_in)
         
                                                        #pour des tests unitaires
         return (state3,state4,no_furnished_demand, phs_in, gas_in, phs_usage, gas_usage)
