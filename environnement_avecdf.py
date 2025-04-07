@@ -43,7 +43,7 @@ class CustomEnv(gym.Env):
 
         # Collection of the data
 
-        
+        self.learning=learning
         
         if learning :
             self.region,self.annee1,annee1_path=selection_annee_aleatoire("./ech_apprentissage")
@@ -76,8 +76,8 @@ class CustomEnv(gym.Env):
         self.ind=0 #compte les heures
         self.begin = 0
         self.end= self.times[-1]
-        demand = demand_data['demand'].values
-        self.demand = np.concatenate([demand])
+         
+        self.demand = demand_data['demand'].values
         
         #self.solar_data = pd.read_csv('./data/solar.csv')['facteur_charge'].values
         #self.wind_data = pd.read_csv('./data/wind_onshore.csv')['facteur_charge'].values
@@ -90,14 +90,27 @@ class CustomEnv(gym.Env):
 
         # definition of the variables of the environment
        
-        self.wind_capacity = 170.1
-        self.solar_capacity = 308.4 # max of energy we can gather using wind / sun in one step
+        #self.wind_capacity = 170.1
+        #self.solar_capacity = 308.4 # max of energy we can gather using wind / sun in one step
+        
+        # Calcul consommation annuelle
+        annual_demand = self.demand.sum()
+
+        # Calcul production potentielle pour 1GW installé
+        annual_solar_per_gw = self.solar_data.sum()
+        annual_wind_per_gw = self.wind_data.sum()
+
+        # Pour avoir 100% de surproduction et un mix 50-50
+        target_production = annual_demand * 3.5
+        self.wind_capacity = target_production/(2 * annual_wind_per_gw)
+        self.solar_capacity = target_production/(2 * annual_solar_per_gw)
+
 
         self.phs_capacity = 180
         self.phs_power = 9.3
         self.phs_efficiency = 0.75
-        
         self.gas_capacity = 125000
+        
         self.gas_power_in = 7.66
         self.gas_power_out = 32.93
         self.gas_efficiency = 0.4
@@ -107,35 +120,42 @@ class CustomEnv(gym.Env):
         self.observation_space = gym.spaces.Box(low=np.array( [0,   0,    -1,               0,          0]), 
                                                 high=np.array([1,   1,     1,               1,          1]),
                                                 dtype=np.float64)
-        self.state = None
         # Self observation space : State vector (date time PHS levels and so on)
         # Self state : Usually at None, used to initialize values at the very first round
         
-        obs, self.eval_data=self.reset()
-        columns = ['indice','time','phs_storage', 'gas_storage', 'total_energy_stored', 'furnished_demand', 'no_furnished_demand', 'residual_production', 'wasted_energy', 'stored_energy', 'reward']
+        self.state, self.eval_data=self.reset()
+        columns = ['time','phs_storage', 'gas_storage', 'total_energy_stored', 'furnished_demand', 'no_furnished_demand', 'residual_production', 'wasted_energy', 'stored_energy', 'reward']
         
         taille_df = self.eval_data["nb_heures"] # A VERIFIER
         self.eval_df = pd.DataFrame(None, index=range(taille_df), columns=columns)
-        self.eval_df.loc[0, "indice"] = 0
         self.eval_df.loc[0, "phs_storage"] = self.eval_data['phs_storage']
         self.eval_df.loc[0, "gas_storage"] = self.eval_data['gas_storage']
         self.eval_df.loc[0, "furnished_demand"] = self.eval_data['total_furnished_demand']
         self.eval_df.loc[0, "no_furnished_demand"] = self.eval_data['total_no_furnished_demand']
         self.eval_df.loc[0, "time"] = self.begin
         self.eval_df.loc[0, "reward"] = self.eval_data['total_reward']
+        self.eval_df.loc[0,"residual_production"]=self.state[2]*(self.wind_capacity+self.solar_capacity)
 
 
 
     def reset(self,seed=None,options=None):
         """Reset the environment to its initial state"""
-        self.begin=np.random.choice(self.times)
+        if self.learning :
+            self.begin=np.random.choice(self.times)
+            self.end=np.random.choice(self.times)
+        else :
+            self.begin=self.times[0]
+            self.end=self.times[-1]
+            
         self.time=self.begin
-        self.end=np.random.choice(self.times)
+        
         self.total_reward = 0
         self.ind=0 #compte les heures
         residual_production=self.wind_capacity*self.wind_data[self.time] + self.solar_capacity*self.solar_data[self.time] - self.demand[self.time]
         
-        level_gas_init=np.random.uniform(0,0.5)
+        
+        
+        level_gas_init=np.random.uniform(0.3,0.7)
         
         
         # We start at a random day and hour of the year, with the residual production of the year, and the energy tanks half full
@@ -177,7 +197,13 @@ class CustomEnv(gym.Env):
 
 
     def reward_v2(self):
-        return 1
+        return self.reward_demand_step()
+    
+    def reward_v3(self):
+        return self.reward_demand_year()
+    
+    def reward_v4(self):
+        return self.reward_demand_periodic(7*24)
     
     
 
@@ -364,12 +390,12 @@ class CustomEnv(gym.Env):
         
         
         self.ind+=1
-        self.eval_df.loc[self.ind, "indice"] = self.ind
         self.eval_df.loc[self.ind, "phs_storage"] = self.state[3]
         self.eval_df.loc[self.ind, "gas_storage"] = self.state[4]
         self.eval_df.loc[self.ind, "furnished_demand"] = max(0,-residual_production-no_furnished_demand)
         self.eval_df.loc[self.ind, "no_furnished_demand"] = no_furnished_demand
         self.eval_df.loc[self.ind, "time"] = self.time
+        self.eval_df.loc[self.ind,"residual_production"]=residual_production
         
         reward = self.reward_function()
         
@@ -402,23 +428,32 @@ class CustomEnv(gym.Env):
             
             
             #plot de la fourniture de la demande
-            plt.figure(figsize=(15,10))
+            plt.figure(figsize=(20,10))
             plt.subplot(311)
             plt.plot(self.eval_df["phs_storage"], label='Niveau PHS')
-            
             plt.legend()
             plt.title('Niveau de stockage phs')
-            plt.subplot(312)
             
+            plt.subplot(312)
             plt.plot(self.eval_df["gas_storage"], label='Niveau P2G')
             plt.legend()
             plt.title('Niveaux de stockage gaz')
-
+            
             plt.subplot(313)
-            plt.plot(self.eval_df["no_furnished_demand"], label='Déficit')
+            plt.plot(self.eval_df["no_furnished_demand"], label='Dem no fournie')
+            plt.plot(self.demand)
             plt.legend()
-            plt.title('Déficits horaires')
+            plt.title('Demande non fournie')
             plt.show()
+            
+            plt.figure(figsize=(20,10))
+            plt.plot(self.eval_df["residual_production"], label='res_prod')
+            plt.plot(-self.eval_df["no_furnished_demand"], label='Déficit')
+            plt.legend()
+            plt.title('Production résiduelle et déficits horaires')
+            plt.show()
+            
+
 
     def close(self):
         """Clean up resources (optional)"""

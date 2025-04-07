@@ -38,5 +38,14 @@ def train(reward,nb_iter,save_freq,name,config_path="./config.yaml") :
     print("time elapsed")
     print(end-start)
 
-train("reward_v1",10000,10000,"test")
+train("reward_v1",10000,10000,"guided_step_week_year_10e4")
+train("reward_v1",100000,100000,"guided_step_week_year_10e5")
+
+train("reward_v2",100000,100000,"guided_step_10e5")
+train("reward_v3",100000,100000,"guided_year_10e5")
+train("reward_v4",100000,1000000,"guided_week_10e5")
+
+train("reward_v1",1000000,1000000,"guided_step_week_year_10e6")
+
+
 #2years_guided_reward_weekly_and_hours_3_10e5

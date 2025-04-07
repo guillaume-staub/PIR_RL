@@ -13,15 +13,23 @@ from stable_baselines3 import SAC
 from environnement_avecdf import CustomEnv
 
 
+def eval_model(model_path):
+    # Visualiser l'agent entraîné
+    model = SAC.load(model_path)
+    env = CustomEnv(learning=False)
+    obs, _ = env.reset()
+    done = False
+    while not done:
+        action, _ = model.predict(obs, deterministic=True)
+        obs, reward, done, truncated, info = env.step(action)
+        
+        env.render()
+        
 
+    
+        
 
-# Visualiser l'agent entraîné
-model = SAC.load("./models/test")
-env = CustomEnv(learning=False)
+#for i in range(2,6):
+    #train(reward,nb_iter,save_freq,name,config_path="./config.yaml")
 
-obs, _ = env.reset()
-done = False
-while not done:
-    action, _ = model.predict(obs, deterministic=True)
-    obs, reward, done, truncated, info = env.step(action)
-    env.render()
+eval_model("./models/test")
