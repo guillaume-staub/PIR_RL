@@ -28,7 +28,7 @@ print(f"Step function: {update_levels_function}")
 
 
 class CustomEnv(gym.Env):
-    def __init__(self,learning=True):
+    def __init__(self,learning=True,test_data=None):
         super(CustomEnv, self).__init__()
 
         # Define action and observation space
@@ -44,6 +44,9 @@ class CustomEnv(gym.Env):
 
         demand_data = pd.read_csv('./data/demand2050_ADEME.csv', header=None)
         demand_data.columns = ["time","demand"]
+        
+        self.learning=learning #on en a besion dans le reset, sur les phse de test on réalisera une série de 2 ans
+        
         self.times = demand_data['time'].values
         self.time = 0   # Time indicator
         self.end= self.times[-1]
@@ -51,7 +54,9 @@ class CustomEnv(gym.Env):
         
         if learning :
             self.region,self.annee,annee_path=selection_annee_aleatoire("./ech_apprentissage")
-        else :
+        elif test_data!=None :
+            self.region,self.annee,annee_path=test_data
+        else : 
             self.region,self.annee,annee_path=selection_annee_aleatoire("./ech_test")
 
         solar_path=os.path.join(annee_path,"solar.csv")
@@ -96,8 +101,12 @@ class CustomEnv(gym.Env):
 
     def reset(self,seed=None,options=None):
         """Reset the environment to its initial state"""
-        self.time=np.random.choice(self.times)
-        self.end=np.random.choice(self.times)
+        if self.learning :
+            self.time=np.random.choice(self.times)
+            self.end=np.random.choice(self.times)
+        else :
+            self.time=0
+            self.end=0
         self.total_reward = 0
         residual_production=self.wind_capacity*self.wind_data[self.time] + self.solar_capacity*self.solar_data[self.time] - self.demand[self.time]
 

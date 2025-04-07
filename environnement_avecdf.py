@@ -174,8 +174,7 @@ class CustomEnv(gym.Env):
     #reward qui prend en compte le step, la semaine et la fin
     def reward_v1(self):
         return self.reward_demand_step()+self.reward_demand_end()+self.reward_demand_periodic(7*24)
-    
-    
+
 
     def reward_v2(self):
         return 1
@@ -191,6 +190,7 @@ class CustomEnv(gym.Env):
         gas_in=0 
         phs_usage=0 
         gas_usage=0
+        no_furnished_demand=0
 
         if action[0]>=0 :
             qty_asked_for_phs=self.phs_power*action[0]      # L'action est un pourcentage de la puissance max des PHS
@@ -212,6 +212,7 @@ class CustomEnv(gym.Env):
                     
                 else :#ici on le force à vider pour répondre à la demande, j'ai peur que l'agent comprenne pas ce qui se passe => ne rien faire plutot et laisser une demande pas remplie ????
                     phs_usage=min(-(residual_production+gas_usage), self.phs_power, self.state[3]*self.phs_efficiency)
+             
                     
         else: # on vide les phs
             phs_usage=min(-self.phs_power*action[0], self.state[3]*self.phs_efficiency*self.phs_capacity)
@@ -222,6 +223,9 @@ class CustomEnv(gym.Env):
             else : #on vide aussi du gaz pour essayer de répondre à la demande
                 gas_usage=min(self.state[4]*self.gas_capacity*self.gas_efficiency,self.gas_power_out,-(residual_production+phs_usage))
             
+            # Computation of the unfurnished demand
+            no_furnished_demand=max(0,-residual_production-gas_usage-phs_usage)
+            
         # Adding the Constraints
         phs_in=min(phs_in,self.phs_power,self.phs_capacity-self.state[3]*self.phs_capacity)
         gas_in=min(gas_in,self.gas_power_in,self.gas_capacity-self.state[4]*self.gas_capacity)
@@ -230,8 +234,7 @@ class CustomEnv(gym.Env):
         state3=self.state[3]+phs_in/self.phs_capacity-phs_usage/self.phs_efficiency/self.phs_capacity
         state4=self.state[4]+gas_in/self.gas_capacity-gas_usage/self.gas_efficiency/self.gas_capacity
         
-        # Computation of the unfurnished demand
-        no_furnished_demand=max(0,-residual_production-gas_usage-phs_usage)
+        
         
         # For unit tests
         return (state3,state4,no_furnished_demand, phs_in, gas_in, phs_usage, gas_usage)
@@ -245,6 +248,7 @@ class CustomEnv(gym.Env):
         gas_in=0 
         phs_usage=0 
         gas_usage=0
+        no_furnished_demand=0
 
         if action[0]>=0 :
             qty_asked_for_phs=self.phs_power*action[0] 
@@ -266,6 +270,7 @@ class CustomEnv(gym.Env):
                 gas_in=phs_usage+residual_production
             else : #on vide aussi du gaz pour essayer de répondre à la demande
                 gas_usage=min(self.state[4]*self.gas_capacity*self.gas_efficiency,self.gas_power_out,-(residual_production+phs_usage))
+            no_furnished_demand=max(0,-residual_production-gas_usage-phs_usage)
          
         #ajout des contraintes
         phs_in=min(phs_in,self.phs_power,self.phs_capacity-self.state[3]*self.phs_capacity)
@@ -276,7 +281,7 @@ class CustomEnv(gym.Env):
         state4=self.state[4]+gas_in/self.gas_capacity-gas_usage/self.gas_efficiency/self.gas_capacity
          
         #calcul demande non fournie
-        no_furnished_demand=max(0,-residual_production-gas_usage-phs_usage)
+        
                                                        #pour des tests unitaires
         return (state3,state4,no_furnished_demand, phs_in, gas_in, phs_usage, gas_usage)
 
@@ -391,12 +396,25 @@ class CustomEnv(gym.Env):
         if self.time==self.end :
             print(self.eval_data)
             
-            #plot du stockage du gaz
-            plt.plot(self.eval_df["indice"],self.eval_df["gas_storage"])
-            plt.title("évolution du taux de remplissage du gaz")
-            plt.show()
             
             #plot de la fourniture de la demande
+            plt.figure(figsize=(15,10))
+            plt.subplot(311)
+            plt.plot(self.eval_df["phs_storage"], label='Niveau PHS')
+            
+            plt.legend()
+            plt.title('Niveau de stockage phs')
+            plt.subplot(312)
+            
+            plt.plot(self.eval_df["gas_storage"], label='Niveau P2G')
+            plt.legend()
+            plt.title('Niveaux de stockage gaz')
+
+            plt.subplot(313)
+            plt.plot(self.eval_df["no_furnished_demand"], label='Déficit')
+            plt.legend()
+            plt.title('Déficits horaires')
+            plt.show()
 
     def close(self):
         """Clean up resources (optional)"""
