@@ -16,7 +16,7 @@ from environnement_avecdf import CustomEnv
 
 
 # Visualiser l'agent entraîné
-model = SAC.load("./models/test")
+model = SAC.load("./models/2years_guided_reward_end_and_hours_3_10e5")
 env = CustomEnv(learning=False)
 
 obs, _ = env.reset()

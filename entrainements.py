@@ -21,16 +21,16 @@ env = Monitor(env)  # Pour enregistrer les logs de performance
 model = SAC("MlpPolicy", env, verbose=1)#, learning_rate=0.0003, gamma=0.99, buffer_size=1000000, batch_size=256, train_freq=1)
 
 # Callback pour sauvegarder le modèle pendant l'entraînement
-checkpoint_callback = CheckpointCallback(save_freq=1000, save_path="./models/", name_prefix="sac_model")
+checkpoint_callback = CheckpointCallback(save_freq=300000, save_path="./models/", name_prefix="sac_model")
 
 
 start=time.time()
 
 # Training the agent
-model.learn(total_timesteps=1000, callback=checkpoint_callback)
+model.learn(total_timesteps=300000, callback=checkpoint_callback)
 
 # Save the final model
-model.save("./models/test")
+model.save("./models/2years_guided_reward_end_and_hours_3_10e5")
 
 end=time.time()
 

@@ -73,6 +73,7 @@ class CustomEnv(gym.Env):
         demand_data.columns = ["time","demand"]
         self.times = demand_data['time'].values
         self.time = 0   # Time indicator
+        self.ind=0 #compte les heures
         self.begin = 0
         self.end= self.times[-1]
         demand = demand_data['demand'].values
@@ -111,14 +112,16 @@ class CustomEnv(gym.Env):
         # Self state : Usually at None, used to initialize values at the very first round
         
         obs, self.eval_data=self.reset()
-        columns = ['phs_storage', 'gas_storage', 'total_energy_stored', 'furnished_demand', 'no_furnished_demand', 'residual_production', 'wasted_energy', 'stored_energy', 'reward']
+        columns = ['indice','time','phs_storage', 'gas_storage', 'total_energy_stored', 'furnished_demand', 'no_furnished_demand', 'residual_production', 'wasted_energy', 'stored_energy', 'reward']
         
         taille_df = self.eval_data["nb_heures"] # A VERIFIER
         self.eval_df = pd.DataFrame(None, index=range(taille_df), columns=columns)
+        self.eval_df.loc[0, "indice"] = 0
         self.eval_df.loc[0, "phs_storage"] = self.eval_data['phs_storage']
         self.eval_df.loc[0, "gas_storage"] = self.eval_data['gas_storage']
         self.eval_df.loc[0, "furnished_demand"] = self.eval_data['total_furnished_demand']
         self.eval_df.loc[0, "no_furnished_demand"] = self.eval_data['total_no_furnished_demand']
+        self.eval_df.loc[0, "time"] = self.begin
         self.eval_df.loc[0, "reward"] = self.eval_data['total_reward']
 
 
@@ -129,6 +132,7 @@ class CustomEnv(gym.Env):
         self.time=self.begin
         self.end=np.random.choice(self.times)
         self.total_reward = 0
+        self.ind=0 #compte les heures
         residual_production=self.wind_capacity*self.wind_data[self.time] + self.solar_capacity*self.solar_data[self.time] - self.demand[self.time]
         
         level_gas_init=np.random.uniform(0,0.5)
@@ -151,15 +155,13 @@ class CustomEnv(gym.Env):
     
 
     def reward_demand_step(self):
-        ind=self.time-self.begin
-        reward=-self.eval_df.loc[ind, "no_furnished_demand"]
+        reward=-self.eval_df.loc[self.ind, "no_furnished_demand"]
         return reward
     
     def reward_demand_periodic(self,period):
-        reward=0 
-        ind=(self.time-self.begin)%(self.nb_jours_annee*24)
-        if self.time>period and self.time%period==0:
-            no_furnished_demand_week=self.eval_df.loc[ind-period:ind, "no_furnished_demand"].sum()
+        reward=0
+        if self.ind>=period and self.ind%period==0:
+            no_furnished_demand_week=self.eval_df.loc[self.ind-period:self.ind, "no_furnished_demand"].sum()
             reward=-no_furnished_demand_week
         return reward
     
@@ -171,7 +173,7 @@ class CustomEnv(gym.Env):
     
     #reward qui prend en compte le step, la semaine et la fin
     def reward_v1(self):
-        return self.reward_demand_step()+self.reward_demand_end()
+        return self.reward_demand_step()+self.reward_demand_end()+self.reward_demand_periodic(7*24)
     
     
 
@@ -352,17 +354,19 @@ class CustomEnv(gym.Env):
         self.eval_data["total_no_furnished_demand"]+=no_furnished_demand
         
         
-        ind=self.time-self.begin+int(not(self.annee1))**(self.times).shape[0]
-        self.eval_df.loc[ind, "phs_storage"] = self.state[3]
-        self.eval_df.loc[ind, "gas_storage"] = self.state[4]
-        self.eval_df.loc[ind, "furnished_demand"] = max(0,-residual_production-no_furnished_demand)
-        self.eval_df.loc[ind, "no_furnished_demand"] = no_furnished_demand
+        self.ind+=1
+        self.eval_df.loc[self.ind, "indice"] = self.ind
+        self.eval_df.loc[self.ind, "phs_storage"] = self.state[3]
+        self.eval_df.loc[self.ind, "gas_storage"] = self.state[4]
+        self.eval_df.loc[self.ind, "furnished_demand"] = max(0,-residual_production-no_furnished_demand)
+        self.eval_df.loc[self.ind, "no_furnished_demand"] = no_furnished_demand
+        self.eval_df.loc[self.ind, "time"] = self.time
         
         reward = self.reward_function()
         
         self.eval_data["total_reward"]+=reward
         
-        self.eval_df.loc[ind, "reward"] = reward
+        self.eval_df.loc[self.ind, "reward"] = reward
 
         
 
@@ -388,7 +392,7 @@ class CustomEnv(gym.Env):
             print(self.eval_data)
             
             #plot du stockage du gaz
-            plt.plot(self.eval_df["gas_storage"])
+            plt.plot(self.eval_df["indice"],self.eval_df["gas_storage"])
             plt.title("évolution du taux de remplissage du gaz")
             plt.show()
             
