@@ -32,4 +32,8 @@ def eval_model(model_path):
 #for i in range(2,6):
     #train(reward,nb_iter,save_freq,name,config_path="./config.yaml")
 
-eval_model("./models/test")
+#eval_model("./models/guided_step_week_year_10e4")
+#eval_model("./models/guided_step_week_year_10e5")
+eval_model("./models/guided_step_10e5")
+eval_model("./models/guided_year_10e5")
+eval_model("./models/guided_week_10e5")

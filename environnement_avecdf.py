@@ -124,18 +124,24 @@ class CustomEnv(gym.Env):
         # Self state : Usually at None, used to initialize values at the very first round
         
         self.state, self.eval_data=self.reset()
-        columns = ['time','phs_storage', 'gas_storage', 'total_energy_stored', 'furnished_demand', 'no_furnished_demand', 'residual_production', 'wasted_energy', 'stored_energy', 'reward']
+        columns = ['time','phs_storage', 'gas_storage', 'phs_in', 'phs_used', 'gas_in', 'gas_used', 'total_energy_stored', 'furnished_demand', 'no_furnished_demand', 'residual_production', 'wasted_energy', 'stored_energy', 'reward']
         
         taille_df = self.eval_data["nb_heures"] # A VERIFIER
         self.eval_df = pd.DataFrame(None, index=range(taille_df), columns=columns)
         self.eval_df.loc[0, "phs_storage"] = self.eval_data['phs_storage']
         self.eval_df.loc[0, "gas_storage"] = self.eval_data['gas_storage']
+        
+        self.eval_df.loc[0, "phs_in"] = 0
+        self.eval_df.loc[0, "phs_used"] = 0
+        self.eval_df.loc[0, "gas_in"] = 0
+        self.eval_df.loc[0, "gas_used"] = 0
+        
         self.eval_df.loc[0, "furnished_demand"] = self.eval_data['total_furnished_demand']
         self.eval_df.loc[0, "no_furnished_demand"] = self.eval_data['total_no_furnished_demand']
         self.eval_df.loc[0, "time"] = self.begin
         self.eval_df.loc[0, "reward"] = self.eval_data['total_reward']
         self.eval_df.loc[0,"residual_production"]=self.state[2]*(self.wind_capacity+self.solar_capacity)
-
+        
 
 
     def reset(self,seed=None,options=None):
@@ -397,6 +403,11 @@ class CustomEnv(gym.Env):
         self.eval_df.loc[self.ind, "time"] = self.time
         self.eval_df.loc[self.ind,"residual_production"]=residual_production
         
+        self.eval_df.loc[self.ind, "phs_in"] = phs_in
+        self.eval_df.loc[self.ind, "phs_used"] = phs_usage
+        self.eval_df.loc[self.ind, "gas_in"] = gas_in
+        self.eval_df.loc[self.ind, "gas_used"] = gas_usage
+        
         reward = self.reward_function()
         
         self.eval_data["total_reward"]+=reward
@@ -411,10 +422,10 @@ class CustomEnv(gym.Env):
         
 
         # Termination condition
-        if bool(self.time==self.begin-1) and self.annee1 :
+        if bool(self.time==(self.begin-1)%(365*24)) and self.annee1 :
             self.annee1=False
         
-        terminated = bool(self.time==self.end) and not(self.annee1)
+        terminated = bool(self.time%(365*24)==self.end) and not(self.annee1)
         
         truncated=False
 
@@ -441,7 +452,6 @@ class CustomEnv(gym.Env):
             
             plt.subplot(313)
             plt.plot(self.eval_df["no_furnished_demand"], label='Dem no fournie')
-            plt.plot(self.demand)
             plt.legend()
             plt.title('Demande non fournie')
             plt.show()
@@ -451,6 +461,34 @@ class CustomEnv(gym.Env):
             plt.plot(-self.eval_df["no_furnished_demand"], label='Déficit')
             plt.legend()
             plt.title('Production résiduelle et déficits horaires')
+            plt.show()
+            
+            # Prepare data for the chart
+            
+            ind=24
+            T=self.eval_df.loc[ind, "time"]
+            
+            #stack_data = [self.wind_data[T:T+168]*self.wind_capacity, self.solar_data[T:T+168]*self.solar_capacity, self.eval_df.loc[ind:ind+167, "phs_used"].values , self.eval_df.loc[ind:ind+167, "gas_used"].values]
+            stack_data = [np.asarray(self.wind_data[T:T+168]*self.wind_capacity, dtype=float), np.asarray(self.solar_data[T:T+168]*self.solar_capacity, dtype=float), np.asarray(self.eval_df["phs_used"].iloc[ind:ind+168].values, dtype=float), np.asarray(self.eval_df["gas_used"].iloc[ind:ind+168].values, dtype=float)]
+            print(stack_data)
+            labels = ['Offshore + Onshore', 'PV', 'PHS', 'Methanation']
+
+            # Create the chart
+            plt.figure(figsize=(16, 8))
+            plt.stackplot(np.arange(T,T+168), stack_data, labels=labels, alpha=0.8)
+
+            # Add demand
+            plt.plot(np.arange(T,T+168), self.demand[T:T+168], color='black', linewidth=2, label='Demand')
+
+            # Add legend and labels
+            plt.title('Cumulative Energy Production', fontsize=16)
+            plt.ylabel('Production (GWh)', fontsize=12)
+            plt.xlabel('Time (hours)', fontsize=12)
+            plt.legend(loc='upper left', fontsize=10)
+            plt.grid(axis='y', linestyle='--', alpha=0.7)
+            plt.tight_layout()
+
+            # Display the chart
             plt.show()
             
 
