@@ -11,9 +11,15 @@
 
 from stable_baselines3 import SAC
 from environnement_avecdf import CustomEnv
+import yaml
 
-
-def eval_model(model_path):
+def eval_model(model_path,reward,config_path="./config.yaml") :
+        
+    with open(config_path, 'r') as file:
+        config = yaml.safe_load(file)
+    config['reward_function'] = reward
+    with open(config_path, 'w') as file:
+        yaml.safe_dump(config, file)
     # Visualiser l'agent entraîné
     model = SAC.load(model_path)
     env = CustomEnv(learning=False)
@@ -34,6 +40,6 @@ def eval_model(model_path):
 
 #eval_model("./models/guided_step_week_year_10e4")
 #eval_model("./models/guided_step_week_year_10e5")
-eval_model("./models/guided_step_10e5")
-eval_model("./models/guided_year_10e5")
-eval_model("./models/guided_week_10e5")
+eval_model("./models/guided_step_week_year_10e5_double_power","reward_v1")
+#eval_model("./models/guided_year_10e5")
+#eval_model("./models/guided_week_10e5")

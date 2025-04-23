@@ -83,7 +83,7 @@ class CustomEnv(gym.Env):
         #self.wind_data = pd.read_csv('./data/wind_onshore.csv')['facteur_charge'].values
 
         #traitement des années bissextiles
-        self.nb_jours_annee=365+(int(self.annee1)%4==0)
+        self.nb_jours_annee=365#+(int(self.annee1)%4==0)
         
         #repère sur l'année en cours
         self.annee1=True
@@ -107,12 +107,12 @@ class CustomEnv(gym.Env):
 
 
         self.phs_capacity = 180
-        self.phs_power = 9.3
+        self.phs_power = 9.3*2
         self.phs_efficiency = 0.75
         self.gas_capacity = 125000
         
-        self.gas_power_in = 7.66
-        self.gas_power_out = 32.93
+        self.gas_power_in = 7.66*2
+        self.gas_power_out = 32.93*2
         self.gas_efficiency = 0.4
 
         # Box observation space with 5 dimensions
@@ -236,7 +236,7 @@ class CustomEnv(gym.Env):
                 gas_in = (residual_production - phs_in) #On ajoutera les contraintes à la fin
                 
             else:
-                gas_usage = min(qty_asked_for_phs - residual_production, self.gas_power_out, self.state[4]*self.gas_efficiency, (1 - self.state[3])*self.phs_capacity-residual_production) #qté de gaz à sortir pour remplir les phs en complément de la prod résiduelle
+                gas_usage = min(qty_asked_for_phs - residual_production, self.gas_power_out, self.state[4]*self.gas_capacity*self.gas_efficiency, (1 - self.state[3])*self.phs_capacity-residual_production) #qté de gaz à sortir pour remplir les phs en complément de la prod résiduelle
                     # La quantité de Gaz que l'on va vider pour remplir les PHS et la demande
                 
                 if (residual_production + gas_usage > 0):
@@ -247,6 +247,7 @@ class CustomEnv(gym.Env):
              
                     
         else: # on vide les phs
+            # rajouter un cas ou on rempli quand meme les phs
             phs_usage=min(-self.phs_power*action[0], self.state[3]*self.phs_efficiency*self.phs_capacity)
 
             if residual_production+phs_usage>0 : #on rempli le gaz
@@ -324,7 +325,9 @@ class CustomEnv(gym.Env):
 
     reward_functions = {
         "reward_v1": reward_v1,
-        "reward_v2": reward_v2
+        "reward_v2": reward_v2,
+        "reward_v3": reward_v3,
+        "reward_v4": reward_v4
     }
     
     update_levels_functions = {
@@ -491,7 +494,32 @@ class CustomEnv(gym.Env):
             # Display the chart
             plt.show()
             
+            
+            ind=32
+            T=self.eval_df.loc[ind, "time"]
+            
+            #stack_data = [self.wind_data[T:T+168]*self.wind_capacity, self.solar_data[T:T+168]*self.solar_capacity, self.eval_df.loc[ind:ind+167, "phs_used"].values , self.eval_df.loc[ind:ind+167, "gas_used"].values]
+            stack_data = [np.asarray(self.eval_df["phs_in"].iloc[ind:ind+168].values, dtype=float), np.asarray(self.eval_df["gas_in"].iloc[ind:ind+168].values, dtype=float), np.asarray(-self.eval_df["phs_used"].iloc[ind:ind+168].values, dtype=float), np.asarray(-self.eval_df["gas_used"].iloc[ind:ind+168].values, dtype=float)]
+            print(stack_data)
+            labels = ['phs_in', 'gas_in', 'phs_used', 'gas_used']
 
+            # Create the chart
+            plt.figure(figsize=(16, 8))
+            plt.stackplot(np.arange(T,T+168), stack_data, labels=labels, alpha=0.8)
+
+            # Add demand
+            plt.plot(np.arange(T,T+168), np.asarray(self.eval_df["residual_production"].iloc[ind:ind+168].values, dtype=float), color='black', linewidth=2, label='Demand')
+
+            # Add legend and labels
+            plt.title('Cumulative Energy Production', fontsize=16)
+            plt.ylabel('Production (GWh)', fontsize=12)
+            plt.xlabel('Time (hours)', fontsize=12)
+            plt.legend(loc='upper left', fontsize=10)
+            plt.grid(axis='y', linestyle='--', alpha=0.7)
+            plt.tight_layout()
+
+            # Display the chart
+            plt.show()
 
     def close(self):
         """Clean up resources (optional)"""
