@@ -12,11 +12,12 @@ from stable_baselines3.common.callbacks import CheckpointCallback
 import time
 import yaml
 
-def train(reward,nb_iter,save_freq,name,config_path="./config.yaml") :
+def train(reward,update_levels,nb_iter,save_freq,name,config_path="./config.yaml") :
     
     with open(config_path, 'r') as file:
         config = yaml.safe_load(file)
     config['reward_function'] = reward
+    config['update_levels_function'] = update_levels
     with open(config_path, 'w') as file:
         yaml.safe_dump(config, file)
     
@@ -39,11 +40,13 @@ def train(reward,nb_iter,save_freq,name,config_path="./config.yaml") :
     print(end-start)
 
 #train("reward_v1",10000,10000,"guided_step_week_year_10e4")
-train("reward_v1",100000,100000,"guided_step_week_year_10e5_double_power")
+train("reward_v1","update_levels_guided",100000,100000,"guided_step_week_year_10e5")
 
-train("reward_v2",100000,100000,"guided_step_10e5_double_power")
-train("reward_v3",100000,100000,"guided_year_10e5_double_power")
-train("reward_v4",100000,1000000,"guided_week_10e5_double_power")
+train("reward_v1","update_levels_unguided",100000,100000,"unguided_step_week_year_10e5")
+
+#train("reward_v2","update_levels_guided",100000,100000,"guided_step_10e5")
+#train("reward_v3","update_levels_guided",100000,100000,"guided_year_10e5")
+#train("reward_v4","update_levels_guided",100000,1000000,"guided_week_10e5")
 
 #train("reward_v1",1000000,1000000,"guided_step_week_year_10e6")
 

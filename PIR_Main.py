@@ -40,6 +40,6 @@ def eval_model(model_path,reward,config_path="./config.yaml") :
 
 #eval_model("./models/guided_step_week_year_10e4")
 #eval_model("./models/guided_step_week_year_10e5")
-eval_model("./models/guided_step_week_year_10e5_double_power","reward_v1")
+eval_model("./models/unguided_step_week_year_10e5","reward_v1")
 #eval_model("./models/guided_year_10e5")
 #eval_model("./models/guided_week_10e5")

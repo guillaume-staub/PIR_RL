@@ -1,2 +1,2 @@
 reward_function: reward_v1
-update_levels_function: update_levels_guided
+update_levels_function: update_levels_unguided

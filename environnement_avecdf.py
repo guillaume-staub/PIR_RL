@@ -107,12 +107,12 @@ class CustomEnv(gym.Env):
 
 
         self.phs_capacity = 180
-        self.phs_power = 9.3*2
+        self.phs_power = 9.3#*2
         self.phs_efficiency = 0.75
         self.gas_capacity = 125000
         
-        self.gas_power_in = 7.66*2
-        self.gas_power_out = 32.93*2
+        self.gas_power_in = 7.66#*2
+        self.gas_power_out = 32.93#*2
         self.gas_efficiency = 0.4
 
         # Box observation space with 5 dimensions
@@ -124,7 +124,7 @@ class CustomEnv(gym.Env):
         # Self state : Usually at None, used to initialize values at the very first round
         
         self.state, self.eval_data=self.reset()
-        columns = ['time','phs_storage', 'gas_storage', 'phs_in', 'phs_used', 'gas_in', 'gas_used', 'total_energy_stored', 'furnished_demand', 'no_furnished_demand', 'residual_production', 'wasted_energy', 'stored_energy', 'reward']
+        columns = ['time','action','phs_storage', 'gas_storage', 'phs_in', 'phs_used', 'gas_in', 'gas_used', 'total_energy_stored', 'furnished_demand', 'no_furnished_demand', 'residual_production', 'wasted_energy', 'stored_energy', 'reward']
         
         taille_df = self.eval_data["nb_heures"] # A VERIFIER
         self.eval_df = pd.DataFrame(None, index=range(taille_df), columns=columns)
@@ -142,6 +142,7 @@ class CustomEnv(gym.Env):
         self.eval_df.loc[0, "reward"] = self.eval_data['total_reward']
         self.eval_df.loc[0,"residual_production"]=self.state[2]*(self.wind_capacity+self.solar_capacity)
         
+        self.eval_df.loc[0, "action"] = 0
 
 
     def reset(self,seed=None,options=None):
@@ -225,18 +226,18 @@ class CustomEnv(gym.Env):
         no_furnished_demand=0
 
         if action[0]>=0 :
-            qty_asked_for_phs=self.phs_power*action[0]      # L'action est un pourcentage de la puissance max des PHS
+            qty_asked_for_phs=min(self.phs_power*action[0],(1 - self.state[3])*self.phs_capacity)      # L'action est un pourcentage de la puissance max des PHS
                                                             # Si la production résiduelle est positive, on remplit les PHS autant qu'on peut avec, le reste est fourni par le Gaz
                                                             # Sinon, on fournit autant qu'on peut avec le Gaz pour satisfaire la demande.
                                                             # Si le Gaz suffit, on utilise aussi du Gaz pour remplir les PHS
                                                             # Sinon on vide les PHS pour fournir la demande
            
             if (residual_production > qty_asked_for_phs):
-                phs_in = min((1 - self.state[3])*self.phs_capacity, qty_asked_for_phs)
+                phs_in = qty_asked_for_phs
                 gas_in = (residual_production - phs_in) #On ajoutera les contraintes à la fin
                 
             else:
-                gas_usage = min(qty_asked_for_phs - residual_production, self.gas_power_out, self.state[4]*self.gas_capacity*self.gas_efficiency, (1 - self.state[3])*self.phs_capacity-residual_production) #qté de gaz à sortir pour remplir les phs en complément de la prod résiduelle
+                gas_usage = min(qty_asked_for_phs - residual_production, self.gas_power_out, self.state[4]*self.gas_capacity*self.gas_efficiency) #qté de gaz à sortir pour remplir les phs en complément de la prod résiduelle
                     # La quantité de Gaz que l'on va vider pour remplir les PHS et la demande
                 
                 if (residual_production + gas_usage > 0):
@@ -250,9 +251,18 @@ class CustomEnv(gym.Env):
             # rajouter un cas ou on rempli quand meme les phs
             phs_usage=min(-self.phs_power*action[0], self.state[3]*self.phs_efficiency*self.phs_capacity)
 
-            if residual_production+phs_usage>0 : #on rempli le gaz
-                gas_in=phs_usage+residual_production
-
+            if residual_production>min(self.gas_power_in,self.gas_capacity-self.state[4]*self.gas_capacity) : #on rempli le gaz puis les phs
+                
+                gas_in=min(self.gas_power_in,self.gas_capacity-self.state[4]*self.gas_capacity)
+                phs_usage=0 
+                phs_in=min(residual_production-gas_in,self.phs_power,self.phs_capacity-self.state[3]*self.phs_capacity)
+                
+            elif residual_production+phs_usage>min(self.gas_power_in,self.gas_capacity-self.state[4]*self.gas_capacity): #on ne vide pas les phs autant que demandé
+                gas_in=min(self.gas_power_in,self.gas_capacity-self.state[4]*self.gas_capacity)
+                phs_usage=gas_in-residual_production
+                
+            elif residual_production+phs_usage>0 : # On utilise tous les phs demandé mais on peut remplir un peu le gaz
+                gas_in= residual_production+phs_usage
             else : #on vide aussi du gaz pour essayer de répondre à la demande
                 gas_usage=min(self.state[4]*self.gas_capacity*self.gas_efficiency,self.gas_power_out,-(residual_production+phs_usage))
             
@@ -262,12 +272,14 @@ class CustomEnv(gym.Env):
         phs_in=min(phs_in,self.phs_power,self.phs_capacity-self.state[3]*self.phs_capacity)
         gas_in=min(gas_in,self.gas_power_in,self.gas_capacity-self.state[4]*self.gas_capacity)
         
+        
+        
         # Update of the capacity levels
         state3=self.state[3]+phs_in/self.phs_capacity-phs_usage/self.phs_efficiency/self.phs_capacity
         state4=self.state[4]+gas_in/self.gas_capacity-gas_usage/self.gas_efficiency/self.gas_capacity
         
         if residual_production<0 :
-            no_furnished_demand=max(0,-residual_production-gas_usage-phs_usage-phs_in-gas_in)
+            no_furnished_demand=max(0,-residual_production-gas_usage-phs_usage+phs_in+gas_in)
         
         # For unit tests
         return (state3,state4,no_furnished_demand, phs_in, gas_in, phs_usage, gas_usage)
@@ -293,8 +305,8 @@ class CustomEnv(gym.Env):
             else:
                 gas_usage = min(qty_asked_for_phs - residual_production, self.gas_power_out, self.state[4]*self.gas_efficiency)#, (1 - self.state[3])*self.phs_capacity-residual_production) #qté de gaz à sortir pour remplir les phs en complément de la prod résiduelle
                 # La quantité de Gaz que l'on va vider pour remplir les PHS et la demande
-                phs_in=min(qty_asked_for_phs, gas_usage, (1 - self.state[3])*self.phs_capacity) #on ajoutera les contraintes à la fin
-                no_furnished_demand=max(0,gas_usage-phs_in+residual_production)
+                phs_in=min(qty_asked_for_phs, gas_usage, (1 - self.state[3])*self.phs_capacity) 
+                no_furnished_demand=min(0,gas_usage-phs_in+residual_production)
          
                 
         else : # on vide les phs
@@ -317,7 +329,7 @@ class CustomEnv(gym.Env):
          
         #calcul demande non fournie
         if residual_production<0 :
-            no_furnished_demand=max(0,-residual_production-gas_usage-phs_usage-phs_in-gas_in)
+            no_furnished_demand=max(0,-residual_production-gas_usage-phs_usage+phs_in+gas_in)
         
                                                        #pour des tests unitaires
         return (state3,state4,no_furnished_demand, phs_in, gas_in, phs_usage, gas_usage)
@@ -373,7 +385,7 @@ class CustomEnv(gym.Env):
         assert (self.state[4]>=0 or self.state[4] <= 1), "L'état 4 est hors des limites définies !"
         
         #test à rajouter pour vérifier que si l'action est de vider
-        assert (action >= 0 or (action[0] < 0 and phs_in <= 0)), "L'agent demande de vider les phs et ils se remplissent"
+        #assert (action >= 0 or (action[0] < 0 and phs_in <= 0)), "L'agent demande de vider les phs et ils se remplissent"
         #test pour vérifier qu'on ne créé pas d'énergie
         assert ((residual_production <= 0) or (residual_production > 0 and round(residual_production, 6) >= round(phs_in+gas_in-phs_usage-gas_usage, 6))), "On a créé de l'énergie, vite déposez un brevet !!!"
         
@@ -382,7 +394,12 @@ class CustomEnv(gym.Env):
         assert (phs_usage<=self.phs_power), "L'utilisation des phs est suppérieure au débit possible"
         assert (gas_in<=self.gas_power_in), "Le remplissage du gaz est suppérieur au débit possible"
         assert (gas_usage<=self.gas_power_out), "L'utilisation des phs est suppérieure au débit possible"
+        assert (round(gas_in,10)>=0),"problème de signe sur le gaz in : " +str(gas_in) + " action : " + str(action) + " production résiduelle : " + str(residual_production)
+        assert (round(gas_usage,10)>=0),"problème de signe sur le gaz out : "+ str(gas_usage)+ " action : " + str(action) + " production résiduelle : " + str(residual_production)
+        assert (round(phs_in,10)>=0),"problème de signe sur les phs in : " +str(phs_in)+ " action : " + str(action) + " production résiduelle : " + str(residual_production)
+        assert (round(phs_usage,10)>=0),"problème de signe sur les phs out" + str(phs_usage) + " action : " + str(action) + " production résiduelle : " + str(residual_production)
       
+        
         # Reward function
         # cout basé sur la pénalité d'écrétage / de perte par conversion d'énergie ?
         
@@ -410,6 +427,7 @@ class CustomEnv(gym.Env):
         self.eval_df.loc[self.ind, "phs_used"] = phs_usage
         self.eval_df.loc[self.ind, "gas_in"] = gas_in
         self.eval_df.loc[self.ind, "gas_used"] = gas_usage
+        self.eval_df.loc[self.ind, "action"] = action
         
         reward = self.reward_function()
         
@@ -472,9 +490,9 @@ class CustomEnv(gym.Env):
             T=self.eval_df.loc[ind, "time"]
             
             #stack_data = [self.wind_data[T:T+168]*self.wind_capacity, self.solar_data[T:T+168]*self.solar_capacity, self.eval_df.loc[ind:ind+167, "phs_used"].values , self.eval_df.loc[ind:ind+167, "gas_used"].values]
-            stack_data = [np.asarray(self.wind_data[T:T+168]*self.wind_capacity, dtype=float), np.asarray(self.solar_data[T:T+168]*self.solar_capacity, dtype=float), np.asarray(self.eval_df["phs_used"].iloc[ind:ind+168].values, dtype=float), np.asarray(self.eval_df["gas_used"].iloc[ind:ind+168].values, dtype=float)]
+            stack_data = [np.asarray(self.wind_data[T:T+168]*self.wind_capacity, dtype=float), np.asarray(self.solar_data[T:T+168]*self.solar_capacity, dtype=float), np.asarray(self.eval_df["phs_used"].iloc[ind:ind+168].values, dtype=float), np.asarray(self.eval_df["gas_used"].iloc[ind:ind+168].values, dtype=float),np.asarray(self.eval_df["no_furnished_demand"].iloc[ind:ind+168].values, dtype=float)]
             print(stack_data)
-            labels = ['Offshore + Onshore', 'PV', 'PHS', 'Methanation']
+            labels = ['Offshore + Onshore', 'PV', 'PHS', 'Methanation', "no_furnished_demand"]
 
             # Create the chart
             plt.figure(figsize=(16, 8))
@@ -499,16 +517,19 @@ class CustomEnv(gym.Env):
             T=self.eval_df.loc[ind, "time"]
             
             #stack_data = [self.wind_data[T:T+168]*self.wind_capacity, self.solar_data[T:T+168]*self.solar_capacity, self.eval_df.loc[ind:ind+167, "phs_used"].values , self.eval_df.loc[ind:ind+167, "gas_used"].values]
-            stack_data = [np.asarray(self.eval_df["phs_in"].iloc[ind:ind+168].values, dtype=float), np.asarray(self.eval_df["gas_in"].iloc[ind:ind+168].values, dtype=float), np.asarray(-self.eval_df["phs_used"].iloc[ind:ind+168].values, dtype=float), np.asarray(-self.eval_df["gas_used"].iloc[ind:ind+168].values, dtype=float)]
+            stack_data = [np.asarray(-self.eval_df["phs_used"].iloc[ind:ind+168].values, dtype=float), np.asarray(-self.eval_df["gas_used"].iloc[ind:ind+168].values, dtype=float),np.asarray(self.eval_df["phs_in"].iloc[ind:ind+168].values, dtype=float), np.asarray(self.eval_df["gas_in"].iloc[ind:ind+168].values, dtype=float), -np.asarray(self.eval_df["no_furnished_demand"].iloc[ind:ind+168].values, dtype=float)]
             print(stack_data)
-            labels = ['phs_in', 'gas_in', 'phs_used', 'gas_used']
+            labels = ['phs_used', 'gas_used','phs_in', 'gas_in', "no_furnished_demand"]
 
             # Create the chart
             plt.figure(figsize=(16, 8))
             plt.stackplot(np.arange(T,T+168), stack_data, labels=labels, alpha=0.8)
 
             # Add demand
-            plt.plot(np.arange(T,T+168), np.asarray(self.eval_df["residual_production"].iloc[ind:ind+168].values, dtype=float), color='black', linewidth=2, label='Demand')
+            plt.plot(np.arange(T,T+168), np.asarray(self.eval_df["residual_production"].iloc[ind:ind+168].values, dtype=float), color='black', linewidth=2, label='residual production')
+            
+            #add action
+            plt.plot(np.arange(T,T+168), np.asarray(self.eval_df["action"].iloc[ind:ind+168].values, dtype=float)*10, color='grey', linewidth=2, label='action*10')
 
             # Add legend and labels
             plt.title('Cumulative Energy Production', fontsize=16)
