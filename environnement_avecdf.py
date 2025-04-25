@@ -107,12 +107,12 @@ class CustomEnv(gym.Env):
 
 
         self.phs_capacity = 180
-        self.phs_power = 9.3#*2
+        self.phs_power = 9.3
         self.phs_efficiency = 0.75
         self.gas_capacity = 125000
         
-        self.gas_power_in = 7.66#*2
-        self.gas_power_out = 32.93#*2
+        self.gas_power_in = 7.66
+        self.gas_power_out = 32.93
         self.gas_efficiency = 0.4
 
         # Box observation space with 5 dimensions
@@ -207,7 +207,7 @@ class CustomEnv(gym.Env):
         return self.reward_demand_step()
     
     def reward_v3(self):
-        return self.reward_demand_year()
+        return self.reward_demand_end()
     
     def reward_v4(self):
         return self.reward_demand_periodic(7*24)
@@ -244,7 +244,7 @@ class CustomEnv(gym.Env):
                     phs_in=residual_production+gas_usage #on ajoutera les contraintes à la fin
                     
                 else :#ici on le force à vider pour répondre à la demande, j'ai peur que l'agent comprenne pas ce qui se passe => ne rien faire plutot et laisser une demande pas remplie ????
-                    phs_usage=min(-(residual_production+gas_usage), self.phs_power, self.state[3]*self.phs_efficiency)
+                    phs_usage=min(-(residual_production+gas_usage), self.phs_power, self.state[3]*self.phs_efficiency*self.phs_capacity)
              
                     
         else: # on vide les phs
@@ -303,7 +303,7 @@ class CustomEnv(gym.Env):
                 gas_in = (residual_production - qty_asked_for_phs) #perte d'énergie si l'agent veut trop remplir les phs
                      
             else:
-                gas_usage = min(qty_asked_for_phs - residual_production, self.gas_power_out, self.state[4]*self.gas_efficiency)#, (1 - self.state[3])*self.phs_capacity-residual_production) #qté de gaz à sortir pour remplir les phs en complément de la prod résiduelle
+                gas_usage = min(qty_asked_for_phs - residual_production, self.gas_power_out, self.state[4]*self.gas_efficiency*self.gas_capacity)#, (1 - self.state[3])*self.phs_capacity-residual_production) #qté de gaz à sortir pour remplir les phs en complément de la prod résiduelle
                 # La quantité de Gaz que l'on va vider pour remplir les PHS et la demande
                 phs_in=min(qty_asked_for_phs, gas_usage, (1 - self.state[3])*self.phs_capacity) 
                 no_furnished_demand=min(0,gas_usage-phs_in+residual_production)
