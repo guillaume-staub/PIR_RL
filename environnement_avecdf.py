@@ -29,7 +29,7 @@ print(f"Step function: {update_levels_function}")
 
 
 class CustomEnv(gym.Env):
-    def __init__(self,learning=True):
+    def __init__(self,learning=True,annee1_path=""):
         super(CustomEnv, self).__init__()
 
         # Define action and observation space
@@ -45,14 +45,18 @@ class CustomEnv(gym.Env):
 
         self.learning=learning
         
-        if learning :
-            self.region,self.annee1,annee1_path=selection_annee_aleatoire("./ech_apprentissage")
-            self.region,self.annee2,annee2_path=selection_annee_aleatoire("./ech_apprentissage",self.region)
-        else :
-            self.region,self.annee1,annee1_path=selection_annee_aleatoire("./ech_test")
-            self.region,self.annee2,annee2_path=selection_annee_aleatoire("./ech_test",self.region)
+        if annee1_path=="" :
+            if learning :
+                self.region,self.annee1,annee1_path=selection_annee_aleatoire("./ech_apprentissage")
+                self.region,self.annee2,annee2_path=selection_annee_aleatoire("./ech_apprentissage",self.region)
+            else :
+                self.region,self.annee1,annee1_path=selection_annee_aleatoire("./ech_test")
+                self.region,self.annee2,annee2_path=selection_annee_aleatoire("./ech_test",self.region)
 
-
+        else : 
+            annee2_path=annee1_path
+            self.annee1=2001
+            self.annee2=2001 #année arbitraire
         #chargement des données pour deux années
         
         solar_path1=os.path.join(annee1_path,"solar.csv")
@@ -198,6 +202,18 @@ class CustomEnv(gym.Env):
             reward=-self.eval_df["no_furnished_demand"].sum()
         return reward
     
+    def reward_gas_storage(self):
+        reward=0
+        if self.eval_df.loc[self.ind, "no_furnished_demand"]>0 :
+            reward=self.state[4]*100
+        return reward
+    
+    def reward_gas_storage_end(self):
+        reward=0
+        if self.time==self.end :
+            reward=self.state[4]*self.gas_capacity
+        return reward
+    
     #reward qui prend en compte le step, la semaine et la fin
     def reward_v1(self):
         return self.reward_demand_step()+self.reward_demand_end()+self.reward_demand_periodic(7*24)
@@ -212,6 +228,11 @@ class CustomEnv(gym.Env):
     def reward_v4(self):
         return self.reward_demand_periodic(7*24)
     
+    def reward_v5(self):                           # grosse pénalité si le gaz devient très bas
+        return self.reward_v1()+self.reward_gas_storage()+self.reward_gas_storage_end()
+    
+    def reward_v6(self):                           # grosse pénalité si le gaz devient très bas
+        return self.reward_v1()+self.reward_gas_storage_end()
     
 
 
@@ -339,7 +360,9 @@ class CustomEnv(gym.Env):
         "reward_v1": reward_v1,
         "reward_v2": reward_v2,
         "reward_v3": reward_v3,
-        "reward_v4": reward_v4
+        "reward_v4": reward_v4,
+        "reward_v5": reward_v5,
+        "reward_v6": reward_v6,
     }
     
     update_levels_functions = {
@@ -513,7 +536,7 @@ class CustomEnv(gym.Env):
             plt.show()
             
             
-            ind=32
+            ind=1000
             T=self.eval_df.loc[ind, "time"]
             
             #stack_data = [self.wind_data[T:T+168]*self.wind_capacity, self.solar_data[T:T+168]*self.solar_capacity, self.eval_df.loc[ind:ind+167, "phs_used"].values , self.eval_df.loc[ind:ind+167, "gas_used"].values]
