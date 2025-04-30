@@ -111,12 +111,12 @@ class CustomEnv(gym.Env):
 
 
         self.phs_capacity = 180
-        self.phs_power = 9.3
+        self.phs_power = 9.3*2
         self.phs_efficiency = 0.75
         self.gas_capacity = 125000
         
-        self.gas_power_in = 7.66
-        self.gas_power_out = 32.93
+        self.gas_power_in = 7.66*2
+        self.gas_power_out = 32.93*2
         self.gas_efficiency = 0.4
 
         # Box observation space with 5 dimensions
@@ -154,9 +154,11 @@ class CustomEnv(gym.Env):
         if self.learning :
             self.begin=np.random.choice(self.times)
             self.end=np.random.choice(self.times)
+            level_gas_init=np.random.uniform(0.3,0.7)
         else :
             self.begin=self.times[0]
             self.end=self.times[-1]
+            level_gas_init=0.5
             
         self.time=self.begin
         
@@ -166,7 +168,7 @@ class CustomEnv(gym.Env):
         
         
         
-        level_gas_init=np.random.uniform(0.3,0.7)
+        
         
         
         # We start at a random day and hour of the year, with the residual production of the year, and the energy tanks half full
@@ -579,3 +581,6 @@ check_env(CustomEnv(), warn=True, skip_render_check=True)
 #création config
 
 #voir RTE
+
+#graph reward
+#evaluer tous les n épisodes vs heuristique à la fois pour général et overfitting

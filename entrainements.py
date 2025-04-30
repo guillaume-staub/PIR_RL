@@ -9,6 +9,9 @@ from environnement_avecdf import CustomEnv
 from stable_baselines3 import SAC
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.callbacks import CheckpointCallback
+from PIR_Main import eval_model_train
+import numpy as np
+import matplotlib.pyplot as plt
 import time
 import yaml
 
@@ -28,9 +31,24 @@ def train(reward,update_levels,nb_iter,save_freq,name,config_path="./config.yaml
     model = SAC("MlpPolicy", env, verbose=1)#, learning_rate=0.0003, gamma=0.99, buffer_size=1000000, batch_size=256, train_freq=1)
     # Callback pour sauvegarder le modèle pendant l'entraînement
     checkpoint_callback = CheckpointCallback(save_freq=save_freq, save_path="./models/", name_prefix="tmp_save")
+    
+    
+    
     start=time.time()
     # Training the agent
-    model.learn(total_timesteps=nb_iter, callback=checkpoint_callback)
+    
+    nb_eval=nb_iter//10
+    path_eval="./data"
+    
+    reward=np.zeros(nb_eval)
+    
+    for i in range (nb_eval) : 
+        model.learn(total_timesteps=nb_iter, callback=checkpoint_callback)
+        model_path="./models/"+name
+        model.save(model_path)
+        info=eval_model_train(model_path,path=path_eval)
+        reward[i]=info["total_reward"]
+        
     # Save the final model
     model.save("./models/"+name)
     end=time.time()
@@ -38,25 +56,36 @@ def train(reward,update_levels,nb_iter,save_freq,name,config_path="./config.yaml
     print("name")
     print("time elapsed")
     print(end-start)
+    plt.title("Reward evolution every 100 trainings")
+    plt.plot(reward)
 
-#train("reward_v1",10000,10000,"guided_step_week_year_10e4")
+train("reward_v1","update_levels_guided",10000,10000,"guided_step_week_year_10e3")
 
 path="./data"
-train("reward_v5","update_levels_unguided",100000,100000,"unguided_v5_10e5_overfitting",path=path)
 
-train("reward_v5","update_levels_unguided",100000,100000,"unguided_v5_10e5")
+#train("reward_v6","update_levels_guided",100000,100000,"guided_v6_10e5_overfitting_double_power",path=path)
+#train("reward_v5","update_levels_unguided",1,1,"unguided_v5_1_double_power")
 
-train("reward_v6","update_levels_unguided",100000,100000,"unguided_v6_10e5_overfitting",path=path)
+#train("reward_v5","update_levels_unguided",100000,100000,"unguided_v5_10e5")
 
-train("reward_v6","update_levels_unguided",100000,100000,"unguided_v6_10e5")
+#train("reward_v6","update_levels_unguided",100000,100000,"unguided_v6_10e5_overfitting",path=path)
 
-train("reward_v5","update_levels_guided",100000,100000,"guided_v5_10e5_overfitting",path=path)
+#train("reward_v6","update_levels_unguided",100000,100000,"unguided_v6_10e5_double_power")
 
-train("reward_v5","update_levels_guided",100000,100000,"guided_v5_10e5")
+#train("reward_v6","update_levels_guided",100000,100000,"guided_v6_10e5_double_power")
 
-train("reward_v6","update_levels_guided",100000,100000,"guided_v6_10e5_overfitting",path=path)
+#train("reward_v6","update_levels_guided",100000,100000,"guided_v5_10e5_double_power")
 
-train("reward_v6","update_levels_guided",100000,100000,"guided_v6_10e5")
+
+#train("reward_v5","update_levels_guided",100000,100000,"guided_v5_10e5_overfitting",path=path)
+
+#train("reward_v5","update_levels_guided",100000,100000,"guided_v5_10e5")
+
+#train("reward_v6","update_levels_guided",100000,100000,"guided_v6_10e5_overfitting",path=path)
+
+#train("reward_v6","update_levels_guided",100000,100000,"guided_v6_10e5")
+
+
 #train("reward_v3","update_levels_guided",100000,100000,"guided_year_10e5")
 #train("reward_v4","update_levels_guided",100000,1000000,"guided_week_10e5")
 

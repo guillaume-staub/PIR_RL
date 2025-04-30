@@ -13,6 +13,23 @@ from stable_baselines3 import SAC
 from environnement_avecdf import CustomEnv
 import yaml
 
+def eval_model_train(model_path,path="") :
+        
+
+    # Visualiser l'agent entraîné
+    model = SAC.load(model_path)
+    env = CustomEnv(learning=False,annee1_path=path)
+    obs, _ = env.reset()
+    done = False
+    while not done:
+        action, _ = model.predict(obs, deterministic=True)
+        obs, reward, done, truncated, info = env.step(action)
+        env.render()
+        
+        
+    return info
+        
+
 def eval_model(model_path,reward,update_levels,config_path="./config.yaml",path="") :
         
     with open(config_path, 'r') as file:
@@ -32,6 +49,8 @@ def eval_model(model_path,reward,update_levels,config_path="./config.yaml",path=
         obs, reward, done, truncated, info = env.step(action)
         env.render()
         
+        
+    return info
 
     
         
@@ -42,6 +61,6 @@ def eval_model(model_path,reward,update_levels,config_path="./config.yaml",path=
 #eval_model("./models/guided_step_week_year_10e4")
 #eval_model("./models/guided_step_week_year_10e5")
 path="./data"
-eval_model("./models/unguided_v5_10e5_overfitting","reward_v1","update_levels_unguided",path=path)
+#♥eval_model("./models/unguided_v5_1_double_power","reward_v5","update_levels_unguided",path=path)
 #eval_model("./models/guided_year_10e5")
 #eval_model("./models/guided_week_10e5")
