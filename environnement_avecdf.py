@@ -516,7 +516,6 @@ class CustomEnv(gym.Env):
             
             #stack_data = [self.wind_data[T:T+168]*self.wind_capacity, self.solar_data[T:T+168]*self.solar_capacity, self.eval_df.loc[ind:ind+167, "phs_used"].values , self.eval_df.loc[ind:ind+167, "gas_used"].values]
             stack_data = [np.asarray(self.wind_data[T:T+168]*self.wind_capacity, dtype=float), np.asarray(self.solar_data[T:T+168]*self.solar_capacity, dtype=float), np.asarray(self.eval_df["phs_used"].iloc[ind:ind+168].values, dtype=float), np.asarray(self.eval_df["gas_used"].iloc[ind:ind+168].values, dtype=float),np.asarray(self.eval_df["no_furnished_demand"].iloc[ind:ind+168].values, dtype=float)]
-            print(stack_data)
             labels = ['Offshore + Onshore', 'PV', 'PHS', 'Methanation', "no_furnished_demand"]
 
             # Create the chart
@@ -543,7 +542,6 @@ class CustomEnv(gym.Env):
             
             #stack_data = [self.wind_data[T:T+168]*self.wind_capacity, self.solar_data[T:T+168]*self.solar_capacity, self.eval_df.loc[ind:ind+167, "phs_used"].values , self.eval_df.loc[ind:ind+167, "gas_used"].values]
             stack_data = [np.asarray(-self.eval_df["phs_used"].iloc[ind:ind+168].values, dtype=float), np.asarray(-self.eval_df["gas_used"].iloc[ind:ind+168].values, dtype=float),np.asarray(self.eval_df["phs_in"].iloc[ind:ind+168].values, dtype=float), np.asarray(self.eval_df["gas_in"].iloc[ind:ind+168].values, dtype=float), -np.asarray(self.eval_df["no_furnished_demand"].iloc[ind:ind+168].values, dtype=float)]
-            print(stack_data)
             labels = ['phs_used', 'gas_used','phs_in', 'gas_in', "no_furnished_demand"]
 
             # Create the chart

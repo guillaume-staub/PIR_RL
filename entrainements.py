@@ -59,7 +59,7 @@ def train(reward,update_levels,nb_iter,save_freq,name,config_path="./config.yaml
     plt.title("Reward evolution every 100 trainings")
     plt.plot(reward)
 
-train("reward_v1","update_levels_guided",10000,10000,"guided_step_week_year_10e3")
+train("reward_v1","update_levels_guided",1000,1000,"guided_step_week_year_10e3")
 
 path="./data"
 

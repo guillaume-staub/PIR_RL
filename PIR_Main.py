@@ -24,7 +24,7 @@ def eval_model_train(model_path,path="") :
     while not done:
         action, _ = model.predict(obs, deterministic=True)
         obs, reward, done, truncated, info = env.step(action)
-        env.render()
+        #env.render()
         
         
     return info
