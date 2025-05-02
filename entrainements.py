@@ -37,13 +37,14 @@ def train(reward,update_levels,nb_iter,save_freq,name,config_path="./config.yaml
     start=time.time()
     # Training the agent
     
-    nb_eval=nb_iter//10
+    n=1000
+    nb_eval=nb_iter//n
     path_eval="./data"
     
     reward=np.zeros(nb_eval)
     
     for i in range (nb_eval) : 
-        model.learn(total_timesteps=nb_iter, callback=checkpoint_callback)
+        model.learn(total_timesteps=n, callback=checkpoint_callback)
         model_path="./models/"+name
         model.save(model_path)
         info=eval_model_train(model_path,path=path_eval)
@@ -56,15 +57,22 @@ def train(reward,update_levels,nb_iter,save_freq,name,config_path="./config.yaml
     print("name")
     print("time elapsed")
     print(end-start)
-    plt.title("Reward evolution every 100 trainings")
+    plt.title("Reward evolution every "+str(n)+" trainings")
     plt.plot(reward)
 
-train("reward_v1","update_levels_guided",1000,1000,"guided_step_week_year_10e3")
+#train("reward_v1","update_levels_guided",1000,1000,"guided_step_week_year_10e3")
 
 path="./data"
 
-#train("reward_v6","update_levels_guided",100000,100000,"guided_v6_10e5_overfitting_double_power",path=path)
-#train("reward_v5","update_levels_unguided",1,1,"unguided_v5_1_double_power")
+train("reward_v6","update_levels_guided",100000,100000,"guided_v6_10e5_overfitting_double_power",path=path)
+
+train("reward_v7","update_levels_guided",100000,100000,"guided_v7_10e5_double_power")
+
+train("reward_v7","update_levels_unguided",100000,100000,"unguided_v7_10e5_overfitting_double_power",path=path)
+train("reward_v6","update_levels_unguided",100000,100000,"unguided_v6_10e5_overfitting_double_power",path=path)
+
+train("reward_v7","update_levels_unguided",100000,100000,"unguided_v7_10e5_double_power")
+
 
 #train("reward_v5","update_levels_unguided",100000,100000,"unguided_v5_10e5")
 
