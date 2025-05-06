@@ -111,12 +111,12 @@ class CustomEnv(gym.Env):
 
 
         self.phs_capacity = 180
-        self.phs_power = 9.3*2
+        self.phs_power = 9.3
         self.phs_efficiency = 0.75
         self.gas_capacity = 125000
         
-        self.gas_power_in = 7.66*2
-        self.gas_power_out = 32.93*2
+        self.gas_power_in = 7.66
+        self.gas_power_out = 32.93
         self.gas_efficiency = 0.4
 
         # Box observation space with 5 dimensions
@@ -151,7 +151,7 @@ class CustomEnv(gym.Env):
 
     def reset(self,seed=None,options=None):
         """Reset the environment to its initial state"""
-        if self.learning :
+        if self.learning : # We start at a random day and hour of the year, with the residual production of the year, and the energy tanks half full
             self.begin=np.random.choice(self.times)
             self.end=np.random.choice(self.times)
             level_gas_init=np.random.uniform(0.3,0.7)
@@ -166,12 +166,6 @@ class CustomEnv(gym.Env):
         self.ind=0 #compte les heures
         residual_production=self.wind_capacity*self.wind_data[self.time] + self.solar_capacity*self.solar_data[self.time] - self.demand[self.time]
         
-        
-        
-        
-        
-        
-        # We start at a random day and hour of the year, with the residual production of the year, and the energy tanks half full
         self.state = np.array([self.time%24/24,int(self.time/24)%self.nb_jours_annee/self.nb_jours_annee,residual_production/(self.wind_capacity+self.solar_capacity),1/2,level_gas_init])
 
         # TO DO : the histogram of the values to see if normalization is pertinent
@@ -218,7 +212,7 @@ class CustomEnv(gym.Env):
     
     #reward qui prend en compte le step, la semaine et la fin
     def reward_v1(self):
-        return self.reward_demand_step()+self.reward_demand_end()+self.reward_demand_periodic(7*24)
+        return (self.reward_demand_step()+self.reward_demand_end()+self.reward_demand_periodic(7*24))/(self.gas_capacity+self.phs_capacity)
 
 
     def reward_v2(self):
@@ -234,8 +228,13 @@ class CustomEnv(gym.Env):
         return self.reward_v1()+self.reward_gas_storage()+self.reward_gas_storage_end()
     
     def reward_v6(self):                           # grosse pénalité si le gaz devient très bas
-        return self.reward_v1()+self.reward_gas_storage_end()
+        return (self.reward_v1()+self.reward_gas_storage_end())/(self.gas_capacity+self.phs_capacity)
     
+    def reward_v7(self):                           # grosse pénalité si le gaz devient très bas
+        return self.reward_v1()+self.reward_gas_storage_end()*100+self.reward_gas_storage()*1000
+    
+    def reward_v8(self):
+        return self.reward_gas_storage
 
 
 
@@ -365,6 +364,8 @@ class CustomEnv(gym.Env):
         "reward_v4": reward_v4,
         "reward_v5": reward_v5,
         "reward_v6": reward_v6,
+        "reward_v7": reward_v7,
+        "reward_v8": reward_v8,
     }
     
     update_levels_functions = {
@@ -468,10 +469,12 @@ class CustomEnv(gym.Env):
         
 
         # Termination condition
+        terminated = bool(self.time%(365*24)==self.end) and not(self.annee1)
+        
         if bool(self.time==(self.begin-1)%(365*24)) and self.annee1 :
             self.annee1=False
         
-        terminated = bool(self.time%(365*24)==self.end) and not(self.annee1)
+        
         
         truncated=False
 
