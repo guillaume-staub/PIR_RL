@@ -111,12 +111,12 @@ class CustomEnv(gym.Env):
 
 
         self.phs_capacity = 180
-        self.phs_power = 9.3
+        self.phs_power = 9.3*2
         self.phs_efficiency = 0.75
         self.gas_capacity = 125000
         
-        self.gas_power_in = 7.66
-        self.gas_power_out = 32.93
+        self.gas_power_in = 7.66*2
+        self.gas_power_out = 32.93*2
         self.gas_efficiency = 0.4
 
         # Box observation space with 5 dimensions
@@ -185,11 +185,53 @@ class CustomEnv(gym.Env):
         reward=-self.eval_df.loc[self.ind, "no_furnished_demand"]
         return reward
     
+    def reward_demand_step2(self):
+        no_furnished_demand=self.eval_df.loc[self.ind, "no_furnished_demand"]
+        furnished_demand=self.eval_df.loc[self.ind, "furnished_demand"]
+        max_energy_available=self.phs_power+self.gas_power_out
+        reward=0
+        if -self.state[2]>max_energy_available:
+            reward=-(max_energy_available-furnished_demand)/max_energy_available
+        elif -self.state[2]>furnished_demand:
+            reward=(-self.state[2]-furnished_demand)/self.state[2]
+        return reward
+    
+    def reward_demand_step3(self):
+        reward=0 
+        if self.state[2]<0 :
+            no_furnished_demand=self.eval_df.loc[self.ind, "no_furnished_demand"]
+            furnished_demand=self.eval_df.loc[self.ind, "furnished_demand"]
+            reward=-no_furnished_demand+furnished_demand
+        return reward
+    
     def reward_demand_periodic(self,period):
         reward=0
         if self.ind>=period and self.ind%period==0:
             no_furnished_demand_week=self.eval_df.loc[self.ind-period:self.ind, "no_furnished_demand"].sum()
             reward=-no_furnished_demand_week
+        return reward
+    
+    def reward_demand_periodic2(self,period): #ne fonctionne pas
+        reward=0
+        max_energy_available=self.phs_power+self.gas_power_out
+        if self.ind>=period and self.ind%period==0:
+            quantity_to_furnish=np.minimum(np.ones(period+1)*max_energy_available, np.asarray(self.eval_df.loc[self.ind-period:self.ind, "no_furnished_demand"],dtype=float))
+            print(quantity_to_furnish)
+            print(self.eval_df.loc[self.ind-period:self.ind, "furnished_demand"])
+            reward= np.sum(quantity_to_furnish-np.asarray(self.eval_df.loc[self.ind-period:self.ind, "furnished_demand"],dtype=float))/7*24
+            print(reward)
+            sum_quantity_to_furnish=np.sum(quantity_to_furnish)
+            if sum_quantity_to_furnish>0:
+                reward=reward/sum_quantity_to_furnish
+                print(reward)
+        return reward
+    
+    def reward_demand_periodic3(self,period):
+        reward=0
+        if self.ind>=period and self.ind%period==0:
+            no_furnished_demand=self.eval_df.loc[self.ind-period:self.ind, "no_furnished_demand"].sum()
+            furnished_demand=self.eval_df.loc[self.ind-period:self.ind, "furnished_demand"].sum()
+            reward=furnished_demand-no_furnished_demand
         return reward
     
     def reward_demand_end(self):
@@ -198,43 +240,62 @@ class CustomEnv(gym.Env):
             reward=-self.eval_df["no_furnished_demand"].sum()
         return reward
     
+    def reward_low_level(self):
+        reward=0
+        if self.state[3]<0.05:
+            reward=-0.1
+        if self.state[4]<0.05:
+            reward=-0.2
+        return reward
+    
     def reward_gas_storage(self):
         reward=0
         if self.eval_df.loc[self.ind, "no_furnished_demand"]>0 :
-            reward=self.state[4]*100
+            reward=self.state[4]/10
         return reward
     
     def reward_gas_storage_end(self):
         reward=0
         if self.time==self.end :
-            reward=self.state[4]*self.gas_capacity
+            reward=self.state[4]*5
         return reward
     
     #reward qui prend en compte le step, la semaine et la fin
     def reward_v1(self):
-        return (self.reward_demand_step()+self.reward_demand_end()+self.reward_demand_periodic(7*24))/(self.gas_capacity+self.phs_capacity)
+        return (0.001*self.reward_demand_step()+10*self.reward_demand_end()+self.reward_demand_periodic(20*24))/10**5
 
 
     def reward_v2(self):
-        return self.reward_demand_step()
+        return (self.reward_demand_periodic(7*24)+self.reward_demand_step())/(self.gas_capacity+self.phs_capacity)
     
     def reward_v3(self):
-        return self.reward_demand_end()
+        return (10e-5*self.reward_demand_step()+10*self.reward_demand_end()+self.reward_demand_periodic(20*24))/10**5
     
     def reward_v4(self):
-        return self.reward_demand_periodic(7*24)
+        return (0.001*self.reward_demand_step()+10*self.reward_demand_end()+self.reward_demand_periodic(24))/10**5
     
     def reward_v5(self):                           # grosse pénalité si le gaz devient très bas
         return self.reward_v1()+self.reward_gas_storage()+self.reward_gas_storage_end()
     
     def reward_v6(self):                           # grosse pénalité si le gaz devient très bas
-        return (self.reward_v1()+self.reward_gas_storage_end())/(self.gas_capacity+self.phs_capacity)
+        return self.reward_v1()+self.reward_gas_storage_end()
     
     def reward_v7(self):                           # grosse pénalité si le gaz devient très bas
         return self.reward_v1()+self.reward_gas_storage_end()*100+self.reward_gas_storage()*1000
     
     def reward_v8(self):
-        return self.reward_gas_storage
+        return (0.001*self.reward_demand_step()+10*self.reward_demand_end()+self.reward_demand_periodic(24)*0.1+self.reward_demand_periodic(20*24))/10**5
+    
+    def reward_v9(self):
+        return (0.01*self.reward_demand_step3()+self.reward_demand_periodic3(24))/10**5
+    
+
+    def reward_v10(self):
+        return self.reward_v1()+self.reward_low_level()
+    
+    def reward_v11(self):
+        return (0.001*self.reward_demand_step()+100*self.reward_demand_end()+self.reward_demand_periodic(20*24))/10**5
+
 
 
 
@@ -366,6 +427,9 @@ class CustomEnv(gym.Env):
         "reward_v6": reward_v6,
         "reward_v7": reward_v7,
         "reward_v8": reward_v8,
+        "reward_v9": reward_v9,
+        "reward_v10": reward_v10,
+        "reward_v11": reward_v11
     }
     
     update_levels_functions = {
@@ -424,6 +488,9 @@ class CustomEnv(gym.Env):
         assert (round(gas_usage,10)>=0),"problème de signe sur le gaz out : "+ str(gas_usage)+ " action : " + str(action) + " production résiduelle : " + str(residual_production)
         assert (round(phs_in,10)>=0),"problème de signe sur les phs in : " +str(phs_in)+ " action : " + str(action) + " production résiduelle : " + str(residual_production)
         assert (round(phs_usage,10)>=0),"problème de signe sur les phs out" + str(phs_usage) + " action : " + str(action) + " production résiduelle : " + str(residual_production)
+        
+        assert (round(self.eval_df.loc[self.ind, "no_furnished_demand"],10)>=0),"problème de signe sur la demande non fournie" + str(self.eval_df.loc[self.ind, "no_furnished_demand"])
+        assert (round(self.eval_df.loc[self.ind, "furnished_demand"],10)>=0),"problème de signe sur la demande fournie" + str(self.eval_df.loc[self.ind, "no_furnished_demand"])
       
         
         # Reward function
@@ -483,7 +550,7 @@ class CustomEnv(gym.Env):
 
     def render(self, mode='human'):
         """Render the environment (optional)"""
-        if self.time==self.end :
+        if not(self.learning) and self.time==self.end :
             print(self.eval_data)
             
             
