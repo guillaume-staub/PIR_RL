@@ -11,7 +11,9 @@
 
 from stable_baselines3 import SAC
 from environnement_avecdf import CustomEnv
+import numpy as np
 import yaml
+import matplotlib.pyplot as plt
 
 def eval_model_train(model_path,path="") :
         
@@ -52,21 +54,47 @@ def eval_model(model_path,reward,update_levels,config_path="./config.yaml",path=
         
     return info
 
+def eval_heuristique(agent,reward,update_levels,config_path="./config.yaml",path="") :
+        
+    with open(config_path, 'r') as file:
+        config = yaml.safe_load(file)
+    config['reward_function'] = reward
+    config['update_levels_function'] = update_levels
+    with open(config_path, 'w') as file:
+        yaml.safe_dump(config, file)
+    
+    # Visualiser l'agent entraîné
+    env = CustomEnv(learning=False,annee1_path=path)
+    obs, _ = env.reset()
+    done = False
+    while not done:
+        action= agent()
+        obs, reward, done, truncated, info = env.step(action)
+        env.render()
+        
+        
+    return info
+
 class agent_determine:
     def __init__(self, list_actions):
         self.list_actions = list_actions
         self.counter = 0
-    def __call__(self,state):
+    def __call__(self):
         i=self.counter % len(self.list_actions)
+        self.counter+=1
         action = self.list_actions[i]
-        return action
-    
-    
-        
+        return np.array([action], dtype=np.float32)
+ 
+path="./data"
+#agent=agent_determine(np.load('./actions_heuristique.npy'))
+actions=np.load('actions_heuristique.npy')
+
+eval_heuristique(agent_determine(actions),"reward_v1","update_levels_unguided",path=path)
+  
 
 #for i in range(2,6):
     #train(reward,nb_iter,save_freq,name,config_path="./config.yaml")
-path="./data"
+
 #eval_model("./models/test_unguided_v1_100_10_cb/best_model.zip","reward_v1","update_levels_unguided",path=path)
 #eval_model("./models/guided_step_week_year_10e5")
 

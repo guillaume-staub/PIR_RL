@@ -29,7 +29,7 @@ def train(reward,update_levels,nb_iter,save_freq,name,config_path="./config.yaml
     # Wrapping the environment for logging
     env = CustomEnv(annee1_path=path)
     # SAC model
-    model = SAC("MlpPolicy", env, verbose=1)#, learning_rate=0.0003, gamma=0.99, buffer_size=1000000, batch_size=256, train_freq=1)
+    model = SAC("MlpPolicy", env, verbose=1,buffer_size=1000000,gamma=0.999)#, learning_rate=0.0003, gamma=0.99, buffer_size=1000000, batch_size=256, train_freq=1)
     # Callback pour sauvegarder le modèle pendant l'entraînement
     checkpoint_callback = CheckpointCallback(save_freq=save_freq, save_path="./models/")
     
@@ -77,7 +77,7 @@ def train_evalcallback(reward,update_levels,nb_iter,save_freq,name,config_path="
     env = CustomEnv(annee1_path=path)
     env_eval = CustomEnv(learning=False,annee1_path="./data")
     # SAC model
-    model = SAC("MlpPolicy", env, verbose=1)#, learning_rate=0.0003, gamma=0.99, buffer_size=1000000, batch_size=256, train_freq=1)
+    model = SAC("MlpPolicy", env, verbose=1,buffer_size=1000000,gamma=0.999,learning_rate=0.00003,batch_size=512)#, learning_rate=0.0003, gamma=0.99, buffer_size=1000000, batch_size=256, train_freq=1)
     
     
         
@@ -127,13 +127,13 @@ def plot_eval_rewards_from_file(file_path):
 #train("reward_v1","update_levels_guided",1000,1000,"guided_step_week_year_10e3")
 
 path="./data"
-#train_evalcallback("reward_v11","update_levels_unguided",5000,100,"v11_unguided_100000_100_overfitted_double_power",path=path)
+#train_evalcallback("reward_v12","update_levels_unguided",100000,100,"v12_unguided_100000_100_double_power")
 #train_evalcallback("reward_v4","update_levels_unguided",1000,100,"v4_unguided_1000_100")
 
-name="./logs/v11_unguided_100000_100_overfitted_double_power/evaluations.npz"
+name="./logs/v12_unguided_100000_100_overfitted_double_power/evaluations.npz"
 plot_eval_rewards_from_file(name)
 
-eval_model("./models/v11_unguided_100000_100_overfitted_double_power/best_model.zip","reward_v11","update_levels_unguided",path=path)
+eval_model("./models/v12_unguided_100000_100_overfitted_double_power/best_model.zip","reward_v1","update_levels_unguided",path=path)
 #plot_eval_rewards_from_file("./logs/test_unguided_v1_100_10_cb/evaluations.npz")
 #train("reward_v1","update_levels_unguided",100,10,"test_unguided_v1_10")
 
@@ -184,4 +184,6 @@ eval_model("./models/v11_unguided_100000_100_overfitted_double_power/best_model.
 
 
 #2years_guided_reward_weekly_and_hours_3_10e5
+
 #possibilité évaluation en parallèle
+

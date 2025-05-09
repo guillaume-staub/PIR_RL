@@ -113,7 +113,7 @@ class CustomEnv(gym.Env):
         self.phs_capacity = 180
         self.phs_power = 9.3*2
         self.phs_efficiency = 0.75
-        self.gas_capacity = 125000
+        self.gas_capacity = 125000/0.4
         
         self.gas_power_in = 7.66*2
         self.gas_power_out = 32.93*2
@@ -190,10 +190,11 @@ class CustomEnv(gym.Env):
         furnished_demand=self.eval_df.loc[self.ind, "furnished_demand"]
         max_energy_available=self.phs_power+self.gas_power_out
         reward=0
-        if -self.state[2]>max_energy_available:
+        res_prod=self.state[2]*(self.wind_capacity+self.solar_capacity)
+        if -res_prod>max_energy_available:
             reward=-(max_energy_available-furnished_demand)/max_energy_available
-        elif -self.state[2]>furnished_demand:
-            reward=(-self.state[2]-furnished_demand)/self.state[2]
+        elif -res_prod>furnished_demand:
+            reward=(-res_prod-furnished_demand)/res_prod
         return reward
     
     def reward_demand_step3(self):
@@ -240,12 +241,21 @@ class CustomEnv(gym.Env):
             reward=-self.eval_df["no_furnished_demand"].sum()
         return reward
     
+    def reward_demand_end2(self):
+        reward=0
+        if self.time==self.end :
+            res_prod=np.copy(np.asarray(self.eval_df["residual_production"]))
+            res_prod[res_prod>0]=0
+            if np.sum(res_prod)<0:
+                reward=self.eval_df["no_furnished_demand"].sum()/np.sum(res_prod)
+        return reward
+    
     def reward_low_level(self):
         reward=0
         if self.state[3]<0.05:
+            reward=-0.05
+        if self.state[4]<0.2:
             reward=-0.1
-        if self.state[4]<0.05:
-            reward=-0.2
         return reward
     
     def reward_gas_storage(self):
@@ -260,9 +270,15 @@ class CustomEnv(gym.Env):
             reward=self.state[4]*5
         return reward
     
+    def bonus_rempli(self):
+        reward=0
+        residual_prod=(self.wind_capacity+self.solar_capacity)*self.state[2]
+        if residual_prod>self.phs_power+self.gas_power_in :
+            reward=((self.eval_df.loc[self.ind, "phs_in"]/self.phs_power)>0.9)*0.03
+        return reward
     #reward qui prend en compte le step, la semaine et la fin
     def reward_v1(self):
-        return (0.001*self.reward_demand_step()+10*self.reward_demand_end()+self.reward_demand_periodic(20*24))/10**5
+        return (0.001*self.reward_demand_step()+10*self.reward_demand_end()+self.reward_demand_periodic(20*24))/(self.phs_capacity+self.gas_capacity)
 
 
     def reward_v2(self):
@@ -295,6 +311,10 @@ class CustomEnv(gym.Env):
     
     def reward_v11(self):
         return (0.001*self.reward_demand_step()+100*self.reward_demand_end()+self.reward_demand_periodic(20*24))/10**5
+    
+    def reward_v12(self):
+        return self.reward_demand_step2()*2+self.reward_low_level()+self.reward_demand_end2()*10+self.bonus_rempli()
+        
 
 
 
@@ -429,7 +449,8 @@ class CustomEnv(gym.Env):
         "reward_v8": reward_v8,
         "reward_v9": reward_v9,
         "reward_v10": reward_v10,
-        "reward_v11": reward_v11
+        "reward_v11": reward_v11,
+        "reward_v12": reward_v12
     }
     
     update_levels_functions = {
@@ -443,7 +464,7 @@ class CustomEnv(gym.Env):
 
     def step(self, action):
         """Take an action and return the new state, reward, done, and info"""
-        assert self.action_space.contains(action), "Invalid action!"
+        assert self.action_space.contains(action), "Invalid action!" +str(action)
 
 
         # Add later year periodicity
