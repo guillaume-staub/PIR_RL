@@ -52,15 +52,24 @@ def eval_model(model_path,reward,update_levels,config_path="./config.yaml",path=
         
     return info
 
+class agent_determine:
+    def __init__(self, list_actions):
+        self.list_actions = list_actions
+        self.counter = 0
+    def __call__(self,state):
+        i=self.counter % len(self.list_actions)
+        action = self.list_actions[i]
+        return action
+    
     
         
 
 #for i in range(2,6):
     #train(reward,nb_iter,save_freq,name,config_path="./config.yaml")
-
-#eval_model("./models/guided_step_week_year_10e4")
-#eval_model("./models/guided_step_week_year_10e5")
 path="./data"
+#eval_model("./models/test_unguided_v1_100_10_cb/best_model.zip","reward_v1","update_levels_unguided",path=path)
+#eval_model("./models/guided_step_week_year_10e5")
+
 #♥eval_model("./models/unguided_v5_1_double_power","reward_v5","update_levels_unguided",path=path)
 #eval_model("./models/guided_year_10e5")
 #eval_model("./models/guided_week_10e5")

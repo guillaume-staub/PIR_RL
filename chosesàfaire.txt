@@ -1,0 +1,11 @@
+=> rajouter la série d'actions données par le code heuristique et lancer l'évaluation
+=>envoyer les résultats aux profs + chercher des pistes pour améliorer nos résultats ?
+Qu'est ce qu'il serait le plus pertinent de tester ?
+Donner à l'agent la main sur le gaz plutôt que les phs ?
+Ajuster les paramètres d'entrainements (learning rate…) => encourager l'exploration ?
+Ajuster la reward : malus pour des niveaux de stockages bas, bonus pour des niveaux hauts
+Bonus pou l'utilisation des phs ???
+Valorisation du stockage ?
+Le gas est bas car les phs ne sont utilisés de manière optimale
+
+
