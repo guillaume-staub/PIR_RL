@@ -113,7 +113,7 @@ class CustomEnv(gym.Env):
         self.phs_capacity = 180
         self.phs_power = 9.3*2
         self.phs_efficiency = 0.75
-        self.gas_capacity = 125000/0.4
+        self.gas_capacity = 125000
         
         self.gas_power_in = 7.66*2
         self.gas_power_out = 32.93*2
@@ -186,7 +186,6 @@ class CustomEnv(gym.Env):
         return reward
     
     def reward_demand_step2(self):
-        no_furnished_demand=self.eval_df.loc[self.ind, "no_furnished_demand"]
         furnished_demand=self.eval_df.loc[self.ind, "furnished_demand"]
         max_energy_available=self.phs_power+self.gas_power_out
         reward=0
@@ -197,12 +196,27 @@ class CustomEnv(gym.Env):
             reward=(-res_prod-furnished_demand)/res_prod
         return reward
     
+    
+    
     def reward_demand_step3(self):
         reward=0 
         if self.state[2]<0 :
             no_furnished_demand=self.eval_df.loc[self.ind, "no_furnished_demand"]
             furnished_demand=self.eval_df.loc[self.ind, "furnished_demand"]
             reward=-no_furnished_demand+furnished_demand
+        return reward
+    
+    def reward_demand_step4(self):
+        furnished_demand=self.eval_df.loc[self.ind, "furnished_demand"]
+        max_energy_available=self.phs_power+self.gas_power_out
+        reward=0
+        res_prod=self.state[2]*(self.wind_capacity+self.solar_capacity)
+        if -res_prod>max_energy_available:
+            reward=-(max_energy_available-furnished_demand)/max_energy_available
+        elif -res_prod>furnished_demand:
+            reward=(-res_prod-furnished_demand)/res_prod
+        elif res_prod>min(self.gas_power_in,(1-self.state[4])*self.gas_capacity) and self.state[3]<0.95 and self.eval_df.loc[self.ind, "phs_used"]>0:
+            reward=-0.1
         return reward
     
     def reward_demand_periodic(self,period):
@@ -234,6 +248,7 @@ class CustomEnv(gym.Env):
             furnished_demand=self.eval_df.loc[self.ind-period:self.ind, "furnished_demand"].sum()
             reward=furnished_demand-no_furnished_demand
         return reward
+    
     
     def reward_demand_end(self):
         reward=0
@@ -313,7 +328,7 @@ class CustomEnv(gym.Env):
         return (0.001*self.reward_demand_step()+100*self.reward_demand_end()+self.reward_demand_periodic(20*24))/10**5
     
     def reward_v12(self):
-        return self.reward_demand_step2()*2+self.reward_low_level()+self.reward_demand_end2()*10+self.bonus_rempli()
+        return self.reward_demand_step4()
         
 
 
@@ -578,26 +593,26 @@ class CustomEnv(gym.Env):
             #plot de la fourniture de la demande
             plt.figure(figsize=(20,10))
             plt.subplot(311)
-            plt.plot(self.eval_df["phs_storage"], label='Niveau PHS')
-            plt.legend()
-            plt.title('Niveau de stockage phs')
+            plt.plot(self.eval_df["phs_storage"], label='PHS storage level')
+            #plt.legend()
+            plt.title('PHS storage level')
             
             plt.subplot(312)
-            plt.plot(self.eval_df["gas_storage"], label='Niveau P2G')
-            plt.legend()
-            plt.title('Niveaux de stockage gaz')
+            plt.plot(self.eval_df["gas_storage"], label='Gas storage level')
+            #plt.legend()
+            plt.title('Gas storage level')
             
             plt.subplot(313)
-            plt.plot(self.eval_df["no_furnished_demand"], label='Dem no fournie')
-            plt.legend()
-            plt.title('Demande non fournie')
+            plt.plot(self.eval_df["no_furnished_demand"], label='Unserved energy')
+            #plt.legend()
+            plt.title('Unserved energy')
             plt.show()
             
             plt.figure(figsize=(20,10))
-            plt.plot(self.eval_df["residual_production"], label='res_prod')
-            plt.plot(-self.eval_df["no_furnished_demand"], label='Déficit')
+            plt.plot(self.eval_df["residual_production"], label='Residual load')
+            plt.plot(-self.eval_df["no_furnished_demand"], label='Unserved demand')
             plt.legend()
-            plt.title('Production résiduelle et déficits horaires')
+            plt.title('Résidual production')
             plt.show()
             
             # Prepare data for the chart
