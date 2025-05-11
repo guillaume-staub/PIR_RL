@@ -75,9 +75,11 @@ def train_evalcallback(reward,update_levels,nb_iter,save_freq,name,config_path="
     
     # Wrapping the environment for logging
     env = CustomEnv(annee1_path=path)
-    env_eval = CustomEnv(learning=False,annee1_path="./data")
+    print("done")
+    env_eval = Monitor(CustomEnv(learning=False,annee1_path="./data"))
+    print("done")
     # SAC model
-    model = SAC("MlpPolicy", env, verbose=1,buffer_size=1000000,gamma=0.999,learning_rate=0.00003,batch_size=512)#, learning_rate=0.0003, gamma=0.99, buffer_size=1000000, batch_size=256, train_freq=1)
+    model = SAC("MlpPolicy", env, verbose=1,buffer_size=1000000,gamma=0.999,learning_rate=0.0003,batch_size=512)#, learning_rate=0.0003, gamma=0.99, buffer_size=1000000, batch_size=256, train_freq=1)
     
     
         
@@ -94,7 +96,7 @@ def train_evalcallback(reward,update_levels,nb_iter,save_freq,name,config_path="
                                  deterministic=True, render=False)
     
     start=time.time()
-    
+    print("go")
     model.learn(total_timesteps=nb_iter, callback=[checkpoint_callback, eval_callback])
     
     # Save the final model
@@ -127,13 +129,13 @@ def plot_eval_rewards_from_file(file_path):
 #train("reward_v1","update_levels_guided",1000,1000,"guided_step_week_year_10e3")
 
 path="./data"
-#train_evalcallback("reward_v12","update_levels_unguided",100000,100,"v12_unguided_100000_100_double_power")
+#train_evalcallback("reward_v13","update_levels_unguided_gas",10000,100,"v13_unguidedgas_10000_100_double_power_overfit",path=path)
 #train_evalcallback("reward_v4","update_levels_unguided",1000,100,"v4_unguided_1000_100")
 
-name="./logs/v12_unguided_100000_100_overfitted_double_power/evaluations.npz"
+name="./logs/v13_unguidedgas_10000_100_double_power_overfit/evaluations.npz"
 plot_eval_rewards_from_file(name)
 
-eval_model("./models/v12_unguided_100000_100_overfitted_double_power/best_model.zip","reward_v1","update_levels_unguided",path=path)
+eval_model("./models/v13_unguidedgas_10000_100_double_power_overfit/best_model.zip","reward_v13","update_levels_unguided",path=path)
 #plot_eval_rewards_from_file("./logs/test_unguided_v1_100_10_cb/evaluations.npz")
 #train("reward_v1","update_levels_unguided",100,10,"test_unguided_v1_10")
 
